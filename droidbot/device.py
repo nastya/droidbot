@@ -16,7 +16,8 @@ class Device(object):
     this class describes a connected device
     """
 
-    def __init__(self, device_serial, is_emulator=True, output_dir=None, use_hierarchy_viewer=False):
+    def __init__(self, device_serial, is_emulator=True, output_dir=None,
+                 use_hierarchy_viewer=False, grant_perm=False):
         """
         create a device
         :param device_serial: serial number of target device
@@ -45,6 +46,7 @@ class Device(object):
             os.mkdir(self.output_dir)
 
         self.use_hierarchy_viewer = use_hierarchy_viewer
+        self.grant_perm = grant_perm
 
         if self.is_emulator:
             self.adb_enabled = True
@@ -586,10 +588,14 @@ class Device(object):
         @return:
         """
         assert isinstance(app, App)
+        install_cmd = ["adb", "-s", self.serial, "install"]
+        if self.grant_perm:
+            install_cmd.append("-g")
+        install_cmd.append(app.app_path)
         try:
             subprocess.check_call(["adb", "-s", self.serial, "uninstall", app.get_package_name()],
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            subprocess.check_call(["adb", "-s", self.serial, "install", app.app_path],
+            subprocess.check_call(install_cmd,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except subprocess.CalledProcessError:
             self.logger.error('Failed to install app')
