@@ -17,7 +17,7 @@ class Device(object):
     """
 
     def __init__(self, device_serial, is_emulator=True, output_dir=None,
-                 use_hierarchy_viewer=False, grant_perm=False):
+                 use_hierarchy_viewer=False, grant_perm=False, telnet_auth_token=None):
         """
         create a device
         :param device_serial: serial number of target device
@@ -38,12 +38,12 @@ class Device(object):
         self.release_version = None
         self.ro_debuggable = None
         self.ro_secure = None
+        self.telnet_auth_token = telnet_auth_token
 
         self.output_dir = output_dir
-        if self.output_dir is None:
-            self.output_dir = os.path.abspath("droidbot_out")
-        if not os.path.exists(self.output_dir):
-            os.mkdir(self.output_dir)
+        if output_dir is not None:
+            if not os.path.isdir(output_dir):
+                os.mkdir(output_dir)
 
         self.use_hierarchy_viewer = use_hierarchy_viewer
         self.grant_perm = grant_perm
@@ -66,7 +66,7 @@ class Device(object):
         self.get_ro_secure()
         self.get_ro_debuggable()
         self.get_display_info()
-        self.logcat = self.redirect_logcat()
+        self.logcat = self.redirect_logcat(self.output_dir)
         from state_monitor import StateMonitor
         self.state_monitor = StateMonitor(device=self)
         self.state_monitor.start()
@@ -77,7 +77,7 @@ class Device(object):
 
     def redirect_logcat(self, output_dir=None):
         if output_dir is None:
-            output_dir = self.output_dir
+            return None
         logcat_file = open("%s/logcat.log" % output_dir, "w")
         import subprocess
         subprocess.check_call(["adb", "-s", self.serial, "logcat", "-c"])
@@ -176,12 +176,15 @@ class Device(object):
             self.monkeyrunner.disconnect()
         if self.view_client:
             self.view_client.disconnect()
-        self.logcat.terminate()
+        if self.logcat:
+            self.logcat.terminate()
         self.state_monitor.stop()
-        temp_dir = os.path.join(self.output_dir, "temp")
-        if os.path.exists(temp_dir):
-            import shutil
-            shutil.rmtree(temp_dir)
+
+        if self.output_dir is not None:
+            temp_dir = os.path.join(self.output_dir, "temp")
+            if os.path.exists(temp_dir):
+                import shutil
+                shutil.rmtree(temp_dir)
 
     def get_telnet(self):
         """
@@ -193,7 +196,7 @@ class Device(object):
             try:
                 self.telnet = TelnetConsole(self)
             except Exception:
-                self.logger.warning("Cannot connect to telnet. You may not be able to simulate phonecalls and locations.")
+                self.logger.info("Telnet not connected. If you want to enable telnet, please use an emulator.")
         return self.telnet
 
     def get_adb(self):
@@ -314,6 +317,21 @@ class Device(object):
         self.get_adb().unlock()
 
         # DONE skip first-use turorials, we don't have to
+
+    def shake(self):
+        """
+        shake the device
+        :return: 
+        """
+        telnet = self.get_telnet()
+        if telnet is None:
+            self.logger.warning("Telnet not connected, so can't shake the device.")
+        l2h = range(0, 11)
+        h2l = range(0, 11)
+        h2l.reverse()
+        sensor_xyz = [(-float(v * 10) + 1, float(v) + 9.8, float(v * 2) + 0.5) for v in [1, -1, 1, -1, 1, -1, 0]]
+        for (x,y,z) in sensor_xyz:
+            telnet.run_cmd("sensor set acceleration %f:%f:%f" % (x,y,z))
 
     def add_env(self, env):
         """
@@ -601,11 +619,17 @@ class Device(object):
             self.logger.error('Failed to install app')
             os._exit(0)
 
-        package_info_file_name = "%s/dumpsys_package_%s.txt" % (self.output_dir, app.get_package_name())
-        package_info_file = open(package_info_file_name, "w")
-        subprocess.check_call(["adb", "-s", self.serial, "shell",
-                               "dumpsys", "package", app.get_package_name()], stdout=package_info_file)
-        package_info_file.close()
+        if self.output_dir is not None:
+            package_info_file_name = "%s/dumpsys_package_%s.txt" % (self.output_dir, app.get_package_name())
+            package_info_file = open(package_info_file_name, "w")
+        else:
+            package_info_file = subprocess.PIPE
+
+        subprocess.check_call(["adb", "-s", self.serial, "shell", "dumpsys", "package",
+                               app.get_package_name()], stdout=package_info_file)
+
+        if isinstance(package_info_file, file):
+            package_info_file.close()
 
     def uninstall_app(self, app):
         assert isinstance(app, App)
@@ -668,6 +692,9 @@ class Device(object):
         # except IOError as e:
         #     self.logger.warning("exception in take_screenshot: %s" % e)
         # return image
+        if self.output_dir is None:
+            return None
+
         from datetime import datetime
         tag = datetime.now().strftime("%Y-%m-%d_%H%M%S")
 
@@ -807,7 +834,10 @@ class DeviceState(object):
     def save2dir(self, output_dir=None):
         try:
             if output_dir is None:
-                output_dir = os.path.join(self.device.output_dir, "states")
+                if self.device.output_dir is None:
+                    return
+                else:
+                    output_dir = os.path.join(self.device.output_dir, "states")
             if not os.path.exists(output_dir):
                 os.mkdir(output_dir)
             state_json_file_path = "%s/state_%s.json" % (output_dir, self.tag)

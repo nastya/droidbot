@@ -265,7 +265,7 @@ class AppEnvManager(object):
         deploy the environments to device (Emulator)
         :return:
         """
-        self.logger.info("start deploying environment, policy is %s" % self.policy)
+        self.logger.info("Start deploying environment, policy is %s" % self.policy)
         if self.env_factory is not None:
             self.envs = self.generate_from_factory(self.env_factory)
         if self.envs is None:
@@ -275,10 +275,12 @@ class AppEnvManager(object):
                 break
             self.device.add_env(env)
 
-        out_file = open(os.path.join(self.device.output_dir, "droidbot_env.json"), "w")
-        self.dump(out_file)
-        out_file.close()
-        self.logger.debug("finish deploying environment, saved to droidbot_env.json")
+        self.logger.debug("Finish deploying environment");
+        if self.device.output_dir is not None:
+            out_file = open(os.path.join(self.device.output_dir, "droidbot_env.json"), "w")
+            self.dump(out_file)
+            out_file.close()
+            self.logger.debug("Environment settings saved to droidbot_env.json")
 
     def dump(self, env_file):
         """

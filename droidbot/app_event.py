@@ -22,8 +22,12 @@ POLICY_DFS = "dfs"
 POLICY_MANUAL = "manual"
 # POLICY_FILE = "file"
 
-DEFAULT_EVENT_INTERVAL = 0
-DEFAULT_EVENT_COUNT = 100000
+DEFAULT_POLICY = POLICY_DFS
+DEFAULT_EVENT_INTERVAL = 1
+DEFAULT_EVENT_COUNT = 1000
+DEFAULT_TIMEOUT = -1
+
+START_RETRY_THRESHOLD = 20
 
 POSSIBLE_KEYS = [
     "BACK",
@@ -263,9 +267,12 @@ class EventLog(object):
         }
 
     def save2dir(self, output_dir=None):
-        try:
-            if output_dir is None:
+        if output_dir is None:
+            if self.device.output_dir is None:
+                return
+            else:
                 output_dir = os.path.join(self.device.output_dir, "events")
+        try:
             if not os.path.exists(output_dir):
                 os.mkdir(output_dir)
             event_json_file_path = "%s/event_%s.json" % (output_dir, self.tag)
@@ -273,7 +280,7 @@ class EventLog(object):
             json.dump(self.to_dict(), event_json_file, indent=2)
             event_json_file.close()
         except Exception as e:
-            self.device.logger.warning("saving event to dir failed: " + e.message)
+            self.device.logger.warning("Saving event to dir failed: " + e.message)
 
     def is_start_event(self):
         if isinstance(self.event, IntentEvent):
@@ -319,7 +326,10 @@ class EventLog(object):
                 time.sleep(3)  # guess this time can vary between machines
 
             if output_dir is None:
-                output_dir = os.path.join(self.device.output_dir, "events")
+                if self.device.output_dir is None:
+                    return
+                else:
+                    output_dir = os.path.join(self.device.output_dir, "events")
             if not os.path.exists(output_dir):
                 os.mkdir(output_dir)
             event_trace_local_path = "%s/event_trace_%s.trace" % (output_dir, self.tag)
@@ -802,15 +812,6 @@ class AppEventManager(object):
             from droidbot_script import DroidBotScript
             self.script = DroidBotScript(script_dict)
 
-        if not self.event_count or self.event_count is None:
-            self.event_count = DEFAULT_EVENT_COUNT
-
-        if not self.policy or self.policy is None:
-            self.policy = POLICY_NONE
-
-        if not self.event_interval or self.event_interval is None:
-            self.event_interval = DEFAULT_EVENT_INTERVAL
-
         self.event_factory = self.get_event_factory(device, app)
         self.profiling_method = profiling_method
 
@@ -862,12 +863,15 @@ class AppEventManager(object):
         dump the event information to files
         :return:
         """
+        if self.device.output_dir is None:
+            return
         event_log_file = open(os.path.join(self.device.output_dir, "droidbot_event.json"), "w")
         event_array = []
         for event in self.events:
             event_array.append(event.to_dict())
         json.dump(event_array, event_log_file)
         event_log_file.close()
+        self.logger.debug("Event log saved to droidbot_event.json")
         if self.event_factory is not None:
             self.event_factory.dump()
 
@@ -885,7 +889,7 @@ class AppEventManager(object):
         """
         self.logger.info("start sending events, policy is %s" % self.policy)
 
-        if self.event_duration is not None:
+        if self.event_duration > 0:
             self.timer = Timer(self.event_duration, self.stop)
             self.timer.start()
 
@@ -894,6 +898,8 @@ class AppEventManager(object):
                 self.event_factory.start(self)
             elif self.policy == POLICY_NONE:
                 self.device.start_app(self.app)
+                if self.event_count == 0:
+                    return
                 while self.enabled:
                     time.sleep(1)
             elif self.policy == POLICY_MONKEY:
@@ -920,8 +926,8 @@ class AppEventManager(object):
             pass
 
         self.stop()
+        self.logger.info("Finish sending events")
         self.dump()
-        self.logger.info("finish sending events, saved to droidbot_event.json")
 
     def stop(self):
         """
@@ -1052,6 +1058,7 @@ class StateBasedEventFactory(EventFactory):
         if state is None:
             state = self.device.get_current_state()
 
+        state.save2dir()
         event = None
 
         # if the previous operation is not finished, continue
@@ -1101,6 +1108,8 @@ class StateBasedEventFactory(EventFactory):
         # state_transitions_file = open(os.path.join(self.device.output_dir, "state_transitions.json"), "w")
         # json.dump(list(self.state_transitions), state_transitions_file, indent=2)
         # state_transitions_file.close()
+        if self.device.output_dir is None:
+            return
 
         from state_transition_graph import TransitionGraph
         utg = TransitionGraph(input_path=self.device.output_dir)
@@ -1161,7 +1170,6 @@ class ManualEventFactory(StateBasedEventFactory):
         @param state: DeviceState
         @return: AppEvent
         """
-        state.save2dir()
         self.save_state_transition(self.last_touched_view_str, self.last_state, state)
         view_to_touch = self.wait_for_manual_event(state)
         self.last_touched_view_str = view_to_touch['view_str']
@@ -1292,6 +1300,9 @@ class ManualEventFactory(StateBasedEventFactory):
         dump the explored_views and state_transitions to file
         @return:
         """
+        if self.device.output_dir is None:
+            return
+
         state_transitions_file = open(os.path.join(self.device.output_dir, "state_transitions.json"), "w")
         json.dump(list(self.state_transitions), state_transitions_file, indent=2)
         state_transitions_file.close()
@@ -1362,7 +1373,6 @@ class UtgBfsFactory(StateBasedEventFactory):
         @param state: DeviceState
         @return: AppEvent
         """
-        state.save2dir()
         self.save_state_transition(self.last_event_str, self.last_state, state)
         self.app_model.add_transition(self.last_event_str, self.last_state, state)
 
@@ -1371,9 +1381,10 @@ class UtgBfsFactory(StateBasedEventFactory):
             self.last_event_flag = EVENT_FLAG_STARTED
         else:
             number_of_starts = self.last_event_flag.count(EVENT_FLAG_START_APP)
-            # if we have tried too many times but still not started, stop droidbot
-            if number_of_starts > 5:
+            # If we have tried too many times but the app is still not started, stop DroidBot
+            if number_of_starts > START_RETRY_THRESHOLD:
                 raise StopSendingEventException("The app cannot be started.")
+
             # if app is not started, try start it
             if self.last_event_flag.endswith(EVENT_FLAG_START_APP):
                 # It seems the app stuck at some state, and cannot be started
@@ -1515,7 +1526,6 @@ class UtgDfsFactory(StateBasedEventFactory):
         @param state: DeviceState
         @return: AppEvent
         """
-        state.save2dir()
         self.save_state_transition(self.last_event_str, self.last_state, state)
         self.app_model.add_transition(self.last_event_str, self.last_state, state)
 
@@ -1524,9 +1534,10 @@ class UtgDfsFactory(StateBasedEventFactory):
             self.last_event_flag = EVENT_FLAG_STARTED
         else:
             number_of_starts = self.last_event_flag.count(EVENT_FLAG_START_APP)
-            # if we have tried too many times but still not started, stop droidbot
-            if number_of_starts > 5:
+            # If we have tried too many times but the app is still not started, stop DroidBot
+            if number_of_starts > START_RETRY_THRESHOLD:
                 raise StopSendingEventException("The app cannot be started.")
+
             # if app is not started, try start it
             if self.last_event_flag.endswith(EVENT_FLAG_START_APP):
                 # It seems the app stuck at some state, and cannot be started
