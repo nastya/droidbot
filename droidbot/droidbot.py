@@ -10,22 +10,35 @@ from device import Device
 from app import App
 from app_env import AppEnvManager
 from app_event import AppEventManager
+from input_manager import InputManager
 from droidbox_scripts.droidbox import DroidBox
 
 
 class DroidBot(object):
     """
     The main class of droidbot
-    A robot which interact with Android automatically
     """
     # this is a single instance class
     instance = None
 
-    def __init__(self, app_path, device_serial, output_dir=None,
-                 env_policy=None, event_policy=None, no_shuffle=False, script_path=None,
-                 event_count=None, event_interval=None, event_duration=None,
-                 install_app=False, quiet=False, with_droidbox=False,
-                 use_hierarchy_viewer=False, profiling_method=None, grant_perm=False):
+    def __init__(self,
+                 app_path=None,
+                 device_serial=None,
+                 output_dir=None,
+                 env_policy=None,
+                 policy_name=None,
+                 no_shuffle=False,
+                 script_path=None,
+                 event_count=None,
+                 event_interval=None,
+                 timeout=None,
+                 keep_app=None,
+                 dont_tear_down=False,
+                 quiet=False,
+                 with_droidbox=False,
+                 use_hierarchy_viewer=False,
+                 profiling_method=None,
+                 grant_perm=False):
         """
         initiate droidbot with configurations
         :return:
@@ -40,7 +53,8 @@ class DroidBot(object):
             if not os.path.isdir(output_dir):
                 os.mkdir(output_dir)
 
-        self.install_app = install_app
+        self.dont_tear_down = dont_tear_down
+        self.keep_app = keep_app
 
         # if device_serial is None:
         #     # Dirty Workaround: Set device_serial to Default='.*', because com/dtmilano/android/viewclient.py
@@ -48,30 +62,42 @@ class DroidBot(object):
         #     # FIXED by requiring device_serial in cmd
         #     device_serial = '.*'
 
-        self.device = Device(device_serial, output_dir=self.output_dir,
-                             use_hierarchy_viewer=use_hierarchy_viewer, grant_perm=grant_perm)
-        self.app = App(app_path, output_dir=self.output_dir)
-
+        self.device = None
+        self.app = None
         self.droidbox = None
         self.env_manager = None
-        self.event_manager = None
+        self.input_manager = None
 
         self.enabled = True
 
         try:
+            self.device = Device(device_serial=device_serial,
+                                 output_dir=self.output_dir,
+                                 use_hierarchy_viewer=use_hierarchy_viewer,
+                                 grant_perm=grant_perm)
+            self.app = App(app_path, output_dir=self.output_dir)
+
             if with_droidbox:
                 self.droidbox = DroidBox(droidbot=self, output_dir=self.output_dir)
 
-            self.env_manager = AppEnvManager(self.device, self.app, env_policy)
-            self.event_manager = AppEventManager(self.device, self.app, event_policy, no_shuffle,
-                                                 event_count, event_interval, event_duration,
-                                                 script_path=script_path,
-                                                 profiling_method=profiling_method)
+            self.env_manager = AppEnvManager(device=self.device,
+                                             app=self.app,
+                                             env_policy=env_policy)
+            self.input_manager = InputManager(device=self.device,
+                                              app=self.app,
+                                              policy_name=policy_name,
+                                              no_shuffle=no_shuffle,
+                                              event_count=event_count,
+                                              event_interval=event_interval,
+                                              timeout=timeout,
+                                              script_path=script_path,
+                                              profiling_method=profiling_method)
         except Exception as e:
+            self.logger.warning("Something went wrong: " + e.message)
             import traceback
             traceback.print_exc()
             self.stop()
-            print e
+            sys.exit(-1)
 
     @staticmethod
     def get_instance():
@@ -89,19 +115,29 @@ class DroidBot(object):
             return
         self.logger.info("Starting DroidBot")
         try:
+            self.device.set_up()
+            self.device.connect()
+
             self.device.install_app(self.app)
             self.env_manager.deploy()
 
             if self.droidbox is not None:
                 self.droidbox.set_apk(self.app.app_path)
                 self.droidbox.start_unblocked()
-                self.event_manager.start()
+                self.input_manager.start()
                 self.droidbox.stop()
                 self.droidbox.get_output()
             else:
-                self.event_manager.start()
+                self.input_manager.start()
         except KeyboardInterrupt:
+            self.logger.info("Keyboard interrupt.")
             pass
+        except Exception as e:
+            self.logger.warning("Something went wrong: " + e.message)
+            import traceback
+            traceback.print_exc()
+            self.stop()
+            sys.exit(-1)
 
         self.stop()
         self.logger.info("DroidBot Stopped")
@@ -109,13 +145,15 @@ class DroidBot(object):
     def stop(self):
         if self.env_manager is not None:
             self.env_manager.stop()
-        if self.event_manager is not None:
-            self.event_manager.stop()
+        if self.input_manager is not None:
+            self.input_manager.stop()
         if self.droidbox is not None:
             self.droidbox.stop()
-        if not self.install_app:
-            self.device.uninstall_app(self.app)
         self.device.disconnect()
+        if not self.dont_tear_down:
+            self.device.tear_down()
+        if not self.keep_app:
+            self.device.uninstall_app(self.app)
         self.enabled = False
 
 

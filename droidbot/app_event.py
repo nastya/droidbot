@@ -9,9 +9,10 @@ import os
 import random
 import subprocess
 import time
+import utils
 from threading import Timer
 from intent import Intent
-from device import DeviceState
+from device_state import DeviceState
 
 POLICY_NONE = "none"
 POLICY_STATE_RECORDER = "state_recorder"
@@ -37,120 +38,120 @@ POSSIBLE_KEYS = [
     "VOLUME_DOWN"
 ]
 
-POSSIBLE_ACTIONS = '''
-android.intent.action.AIRPLANE_MODE_CHANGED
-android.intent.action.ALL_APPS
-android.intent.action.ANSWER
-android.intent.action.APPLICATION_RESTRICTIONS_CHANGED
-android.intent.action.APP_ERROR
-android.intent.action.ASSIST
-android.intent.action.ATTACH_DATA
-android.intent.action.BATTERY_CHANGED
-android.intent.action.BATTERY_LOW
-android.intent.action.BATTERY_OKAY
-android.intent.action.BOOT_COMPLETED
-android.intent.action.BUG_REPORT
-android.intent.action.CALL
-android.intent.action.CALL_BUTTON
-android.intent.action.CAMERA_BUTTON
-android.intent.action.CHOOSER
-android.intent.action.CLOSE_SYSTEM_DIALOGS
-android.intent.action.CONFIGURATION_CHANGED
-android.intent.action.CREATE_DOCUMENT
-android.intent.action.CREATE_SHORTCUT
-android.intent.action.DATE_CHANGED
-android.intent.action.DEFAULT
-android.intent.action.DELETE
-android.intent.action.DEVICE_STORAGE_LOW
-android.intent.action.DEVICE_STORAGE_OK
-android.intent.action.DIAL
-android.intent.action.DOCK_EVENT
-android.intent.action.DREAMING_STARTED
-android.intent.action.DREAMING_STOPPED
-android.intent.action.EDIT
-android.intent.action.EXTERNAL_APPLICATIONS_AVAILABLE
-android.intent.action.EXTERNAL_APPLICATIONS_UNAVAILABLE
-android.intent.action.FACTORY_TEST
-android.intent.action.GET_CONTENT
-android.intent.action.GET_RESTRICTION_ENTRIES
-android.intent.action.GTALK_SERVICE_CONNECTED
-android.intent.action.GTALK_SERVICE_DISCONNECTED
-android.intent.action.HEADSET_PLUG
-android.intent.action.INPUT_METHOD_CHANGED
-android.intent.action.INSERT
-android.intent.action.INSERT_OR_EDIT
-android.intent.action.INSTALL_PACKAGE
-android.intent.action.LOCALE_CHANGED
-android.intent.action.MAIN
-android.intent.action.MANAGED_PROFILE_ADDED
-android.intent.action.MANAGED_PROFILE_REMOVED
-android.intent.action.MANAGE_NETWORK_USAGE
-android.intent.action.MANAGE_PACKAGE_STORAGE
-android.intent.action.MEDIA_BAD_REMOVAL
-android.intent.action.MEDIA_BUTTON
-android.intent.action.MEDIA_CHECKING
-android.intent.action.MEDIA_EJECT
-android.intent.action.MEDIA_MOUNTED
-android.intent.action.MEDIA_NOFS
-android.intent.action.MEDIA_REMOVED
-android.intent.action.MEDIA_SCANNER_FINISHED
-android.intent.action.MEDIA_SCANNER_SCAN_FILE
-android.intent.action.MEDIA_SCANNER_STARTED
-android.intent.action.MEDIA_SHARED
-android.intent.action.MEDIA_UNMOUNTABLE
-android.intent.action.MEDIA_UNMOUNTED
-android.intent.action.MY_PACKAGE_REPLACED
-android.intent.action.NEW_OUTGOING_CALL
-android.intent.action.OPEN_DOCUMENT
-android.intent.action.OPEN_DOCUMENT_TREE
-android.intent.action.PACKAGE_ADDED
-android.intent.action.PACKAGE_CHANGED
-android.intent.action.PACKAGE_DATA_CLEARED
-android.intent.action.PACKAGE_FIRST_LAUNCH
-android.intent.action.PACKAGE_FULLY_REMOVED
-android.intent.action.PACKAGE_INSTALL
-android.intent.action.PACKAGE_NEEDS_VERIFICATION
-android.intent.action.PACKAGE_REMOVED
-android.intent.action.PACKAGE_REPLACED
-android.intent.action.PACKAGE_RESTARTED
-android.intent.action.PACKAGE_VERIFIED
-android.intent.action.PASTE
-android.intent.action.PICK
-android.intent.action.PICK_ACTIVITY
-android.intent.action.POWER_CONNECTED
-android.intent.action.POWER_DISCONNECTED
-android.intent.action.POWER_USAGE_SUMMARY
-android.intent.action.PROVIDER_CHANGED
-android.intent.action.QUICK_CLOCK
-android.intent.action.REBOOT
-android.intent.action.RUN
-android.intent.action.SCREEN_OFF
-android.intent.action.SCREEN_ON
-android.intent.action.SEARCH
-android.intent.action.SEARCH_LONG_PRESS
-android.intent.action.SEND
-android.intent.action.SENDTO
-android.intent.action.SEND_MULTIPLE
-android.intent.action.SET_WALLPAPER
-android.intent.action.SHUTDOWN
-android.intent.action.SYNC
-android.intent.action.SYSTEM_TUTORIAL
-android.intent.action.TIMEZONE_CHANGED
-android.intent.action.TIME_CHANGED
-android.intent.action.TIME_TICK
-android.intent.action.UID_REMOVED
-android.intent.action.UMS_CONNECTED
-android.intent.action.UMS_DISCONNECTED
-android.intent.action.UNINSTALL_PACKAGE
-android.intent.action.USER_BACKGROUND
-android.intent.action.USER_FOREGROUND
-android.intent.action.USER_INITIALIZE
-android.intent.action.USER_PRESENT
-android.intent.action.VIEW
-android.intent.action.VOICE_COMMAND
-android.intent.action.WALLPAPER_CHANGED
-android.intent.action.WEB_SEARCH
-'''.splitlines()
+POSSIBLE_ACTIONS = [
+    "android.intent.action.AIRPLANE_MODE_CHANGED",
+    "android.intent.action.ALL_APPS",
+    "android.intent.action.ANSWER",
+    "android.intent.action.APPLICATION_RESTRICTIONS_CHANGED",
+    "android.intent.action.APP_ERROR",
+    "android.intent.action.ASSIST",
+    "android.intent.action.ATTACH_DATA",
+    "android.intent.action.BATTERY_CHANGED",
+    "android.intent.action.BATTERY_LOW",
+    "android.intent.action.BATTERY_OKAY",
+    "android.intent.action.BOOT_COMPLETED",
+    "android.intent.action.BUG_REPORT",
+    "android.intent.action.CALL",
+    "android.intent.action.CALL_BUTTON",
+    "android.intent.action.CAMERA_BUTTON",
+    "android.intent.action.CHOOSER",
+    "android.intent.action.CLOSE_SYSTEM_DIALOGS",
+    "android.intent.action.CONFIGURATION_CHANGED",
+    "android.intent.action.CREATE_DOCUMENT",
+    "android.intent.action.CREATE_SHORTCUT",
+    "android.intent.action.DATE_CHANGED",
+    "android.intent.action.DEFAULT",
+    "android.intent.action.DELETE",
+    "android.intent.action.DEVICE_STORAGE_LOW",
+    "android.intent.action.DEVICE_STORAGE_OK",
+    "android.intent.action.DIAL",
+    "android.intent.action.DOCK_EVENT",
+    "android.intent.action.DREAMING_STARTED",
+    "android.intent.action.DREAMING_STOPPED",
+    "android.intent.action.EDIT",
+    "android.intent.action.EXTERNAL_APPLICATIONS_AVAILABLE",
+    "android.intent.action.EXTERNAL_APPLICATIONS_UNAVAILABLE",
+    "android.intent.action.FACTORY_TEST",
+    "android.intent.action.GET_CONTENT",
+    "android.intent.action.GET_RESTRICTION_ENTRIES",
+    "android.intent.action.GTALK_SERVICE_CONNECTED",
+    "android.intent.action.GTALK_SERVICE_DISCONNECTED",
+    "android.intent.action.HEADSET_PLUG",
+    "android.intent.action.INPUT_METHOD_CHANGED",
+    "android.intent.action.INSERT",
+    "android.intent.action.INSERT_OR_EDIT",
+    "android.intent.action.INSTALL_PACKAGE",
+    "android.intent.action.LOCALE_CHANGED",
+    "android.intent.action.MAIN",
+    "android.intent.action.MANAGED_PROFILE_ADDED",
+    "android.intent.action.MANAGED_PROFILE_REMOVED",
+    "android.intent.action.MANAGE_NETWORK_USAGE",
+    "android.intent.action.MANAGE_PACKAGE_STORAGE",
+    "android.intent.action.MEDIA_BAD_REMOVAL",
+    "android.intent.action.MEDIA_BUTTON",
+    "android.intent.action.MEDIA_CHECKING",
+    "android.intent.action.MEDIA_EJECT",
+    "android.intent.action.MEDIA_MOUNTED",
+    "android.intent.action.MEDIA_NOFS",
+    "android.intent.action.MEDIA_REMOVED",
+    "android.intent.action.MEDIA_SCANNER_FINISHED",
+    "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
+    "android.intent.action.MEDIA_SCANNER_STARTED",
+    "android.intent.action.MEDIA_SHARED",
+    "android.intent.action.MEDIA_UNMOUNTABLE",
+    "android.intent.action.MEDIA_UNMOUNTED",
+    "android.intent.action.MY_PACKAGE_REPLACED",
+    "android.intent.action.NEW_OUTGOING_CALL",
+    "android.intent.action.OPEN_DOCUMENT",
+    "android.intent.action.OPEN_DOCUMENT_TREE",
+    "android.intent.action.PACKAGE_ADDED",
+    "android.intent.action.PACKAGE_CHANGED",
+    "android.intent.action.PACKAGE_DATA_CLEARED",
+    "android.intent.action.PACKAGE_FIRST_LAUNCH",
+    "android.intent.action.PACKAGE_FULLY_REMOVED",
+    "android.intent.action.PACKAGE_INSTALL",
+    "android.intent.action.PACKAGE_NEEDS_VERIFICATION",
+    "android.intent.action.PACKAGE_REMOVED",
+    "android.intent.action.PACKAGE_REPLACED",
+    "android.intent.action.PACKAGE_RESTARTED",
+    "android.intent.action.PACKAGE_VERIFIED",
+    "android.intent.action.PASTE",
+    "android.intent.action.PICK",
+    "android.intent.action.PICK_ACTIVITY",
+    "android.intent.action.POWER_CONNECTED",
+    "android.intent.action.POWER_DISCONNECTED",
+    "android.intent.action.POWER_USAGE_SUMMARY",
+    "android.intent.action.PROVIDER_CHANGED",
+    "android.intent.action.QUICK_CLOCK",
+    "android.intent.action.REBOOT",
+    "android.intent.action.RUN",
+    "android.intent.action.SCREEN_OFF",
+    "android.intent.action.SCREEN_ON",
+    "android.intent.action.SEARCH",
+    "android.intent.action.SEARCH_LONG_PRESS",
+    "android.intent.action.SEND",
+    "android.intent.action.SENDTO",
+    "android.intent.action.SEND_MULTIPLE",
+    "android.intent.action.SET_WALLPAPER",
+    "android.intent.action.SHUTDOWN",
+    "android.intent.action.SYNC",
+    "android.intent.action.SYSTEM_TUTORIAL",
+    "android.intent.action.TIMEZONE_CHANGED",
+    "android.intent.action.TIME_CHANGED",
+    "android.intent.action.TIME_TICK",
+    "android.intent.action.UID_REMOVED",
+    "android.intent.action.UMS_CONNECTED",
+    "android.intent.action.UMS_DISCONNECTED",
+    "android.intent.action.UNINSTALL_PACKAGE",
+    "android.intent.action.USER_BACKGROUND",
+    "android.intent.action.USER_FOREGROUND",
+    "android.intent.action.USER_INITIALIZE",
+    "android.intent.action.USER_PRESENT",
+    "android.intent.action.VIEW",
+    "android.intent.action.VOICE_COMMAND",
+    "android.intent.action.WALLPAPER_CHANGED",
+    "android.intent.action.WEB_SEARCH"
+]
 
 KEY_KeyEvent = "key"
 KEY_TouchEvent = "touch"
@@ -162,16 +163,6 @@ KEY_TextInputEvent = "text_input"
 KEY_IntentEvent = "intent"
 KEY_EmulatorEvent = "emulator"
 KEY_ContextEvent = "context"
-
-
-def weighted_choice(choices):
-    total = sum(choices[c] for c in choices.keys())
-    r = random.uniform(0, total)
-    upto = 0
-    for c in choices.keys():
-        if upto + choices[c] > r:
-            return c
-        upto += choices[c]
 
 
 class UnknownEventException(Exception):
@@ -243,7 +234,7 @@ class EventLog(object):
     save an event to local file system
     """
 
-    def __init__(self, device, app, event, profiling_method, tag=None):
+    def __init__(self, device, app, event, profiling_method=None, tag=None):
         self.device = device
         self.app = app
         self.event = event
@@ -257,7 +248,9 @@ class EventLog(object):
         self.profiling_pid = -1
         self.sampling = None
         # sampling feature was added in Android 5.0 (API level 21)
-        if str(profiling_method) != "full" and self.device.get_sdk_version() >= 21:
+        if profiling_method is not None and \
+           str(profiling_method) != "full" and \
+           self.device.get_sdk_version() >= 21:
             self.sampling = int(profiling_method)
 
     def to_dict(self):
@@ -304,10 +297,10 @@ class EventLog(object):
                 self.is_profiling = True
             return
         if self.sampling is not None:
-            self.device.get_adb().shell(
+            self.device.adb.shell(
                 ["am", "profile", "start", "--sampling", str(self.sampling), str(pid), self.trace_remote_file])
         else:
-            self.device.get_adb().shell(["am", "profile", "start", str(pid), self.trace_remote_file])
+            self.device.adb.shell(["am", "profile", "start", str(pid), self.trace_remote_file])
         self.is_profiling = True
         self.profiling_pid = pid
 
@@ -321,7 +314,7 @@ class EventLog(object):
                     return
                 self.profiling_pid = pid
 
-            self.device.get_adb().shell(["am", "profile", "stop", str(self.profiling_pid)])
+            self.device.adb.shell(["am", "profile", "stop", str(self.profiling_pid)])
             if self.sampling is None:
                 time.sleep(3)  # guess this time can vary between machines
 
@@ -390,7 +383,7 @@ class UIEvent(AppEvent):
                 LongTouchEvent: 2,
                 DragEvent: 2
             }
-            event_type = weighted_choice(choices)
+            event_type = utils.weighted_choice(choices)
             return event_type.get_random_instance(device, app)
 
 
@@ -809,7 +802,7 @@ class AppEventManager(object):
         if script_path is not None:
             f = open(script_path, 'r')
             script_dict = json.load(f)
-            from droidbot_script import DroidBotScript
+            from input_script import DroidBotScript
             self.script = DroidBotScript(script_dict)
 
         self.event_factory = self.get_event_factory(device, app)
@@ -847,16 +840,14 @@ class AppEventManager(object):
             return
         self.events.append(event)
 
+        event_log = EventLog(self.device, self.app, event, self.profiling_method)
         if self.profiling_method is not None:
-            event_log = EventLog(self.device, self.app, event, self.profiling_method)
             event_log.start_profiling()
-            self.device.send_event(event)
-            time.sleep(self.event_interval)
+        self.device.send_event(event)
+        time.sleep(self.event_interval)
+        if self.profiling_method is not None:
             event_log.stop_profiling()
-            event_log.save2dir()
-        else:
-            self.device.send_event(event)
-            time.sleep(self.event_interval)
+        event_log.save2dir()
 
     def dump(self):
         """
@@ -869,7 +860,7 @@ class AppEventManager(object):
         event_array = []
         for event in self.events:
             event_array.append(event.to_dict())
-        json.dump(event_array, event_log_file)
+        json.dump(event_array, event_log_file, indent=2)
         event_log_file.close()
         self.logger.debug("Event log saved to droidbot_event.json")
         if self.event_factory is not None:
@@ -1046,6 +1037,7 @@ class StateBasedEventFactory(EventFactory):
         self.script_events = []
         self.last_event = None
         self.last_state = None
+        self.script_event_idx = 0
 
     def generate_event(self, state=None):
         """
@@ -1055,25 +1047,30 @@ class StateBasedEventFactory(EventFactory):
         """
 
         # Get current device state
-        if state is None:
+        if not state:
             state = self.device.get_current_state()
 
-        state.save2dir()
         event = None
 
-        # if the previous operation is not finished, continue
-        if len(self.script_events) != 0:
-            event = self.script_events.pop(0)
+        if state:
+            state.save2dir()
 
-        # First try matching a state defined in the script
-        if event is None and self.script is not None:
-            operation = self.script.get_operation_based_on_state(state)
-            if operation is not None:
-                self.script_events = operation.events
-                event = self.script_events.pop(0)
+            # if the previous operation is not finished, continue
+            if len(self.script_events) > self.script_event_idx:
+                event = self.script_events[self.script_event_idx]
+                self.script_event_idx += 1
 
-        if event is None:
-            event = self.gen_event_based_on_state_wrapper(state)
+            # First try matching a state defined in the script
+            if event is None and self.script is not None:
+                operation = self.script.get_operation_based_on_state(state)
+                if operation is not None:
+                    self.script_events = operation.events
+                    # restart script
+                    event = self.script_events[0]
+                    self.script_event_idx = 1
+
+            if event is None:
+                event = self.gen_event_based_on_state_wrapper(state)
 
         self.last_state = state
         self.last_event = event
@@ -1085,7 +1082,7 @@ class StateBasedEventFactory(EventFactory):
         @param state: instance of DeviceState
         @return: event: instance of AppEvent
         """
-        from device import DeviceState
+        from device_state import DeviceState
         if isinstance(state, DeviceState):
             event = self.gen_event_based_on_state(state)
             assert isinstance(event, AppEvent) or event is None
@@ -1108,6 +1105,10 @@ class StateBasedEventFactory(EventFactory):
         # state_transitions_file = open(os.path.join(self.device.output_dir, "state_transitions.json"), "w")
         # json.dump(list(self.state_transitions), state_transitions_file, indent=2)
         # state_transitions_file.close()
+
+        return
+        # TODO: refactor TransitionGraph module
+        """
         if self.device.output_dir is None:
             return
 
@@ -1116,6 +1117,7 @@ class StateBasedEventFactory(EventFactory):
         utg_file = open(os.path.join(self.device.output_dir, "droidbot_UTG.json"), "w")
         json.dump(utg.data, utg_file, indent=2)
         utg_file.close()
+        """
 
 
 class RandomEventFactory(StateBasedEventFactory):
@@ -1137,7 +1139,7 @@ class RandomEventFactory(StateBasedEventFactory):
         @param state: DeviceState
         @return:
         """
-        event_type = weighted_choice(self.choices)
+        event_type = utils.weighted_choice(self.choices)
         event = event_type.get_random_instance(self.device, self.app)
         return event
 

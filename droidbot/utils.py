@@ -31,6 +31,21 @@ def parse_log(log_msg):
     return log_dict
 
 
+def get_available_devices():
+    """
+    Get a list of device serials connected via adb
+    :return: 
+    """
+    import subprocess
+    lines = subprocess.check_output(["adb", "devices"]).splitlines()
+    devices = []
+    for line in lines:
+        segs = line.strip().split()
+        if len(segs) == 2 and segs[1] == "device":
+            devices.append(segs[0])
+    return devices
+
+
 class Timeout:
     def __init__(self, seconds=0, error_message='Timeout'):
         self.seconds = seconds
@@ -46,6 +61,24 @@ class Timeout:
 
     def __exit__(self, type, value, traceback):
         signal.alarm(0)
+
+
+def weighted_choice(choices):
+    import random
+    total = sum(choices[c] for c in choices.keys())
+    r = random.uniform(0, total)
+    upto = 0
+    for c in choices.keys():
+        if upto + choices[c] > r:
+            return c
+        upto += choices[c]
+
+
+def safe_re_match(regex, content):
+    if not regex or not content:
+        return None
+    else:
+        return regex.match(content)
 
 
 class TimeoutException(Exception):

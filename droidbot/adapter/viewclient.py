@@ -9,6 +9,7 @@ import time
 import types
 import xml.parsers.expat
 from adb import ADB
+from adapter import Adapter
 from viewclient_utils import _nd, _nh, _ns, obtainPxPy, obtainVwVh, obtainVxVy, Window
 
 VIEW_SERVER_HOST = 'localhost'
@@ -56,7 +57,6 @@ class View:
         """
         Copy constructor
         """
-
         return cls(view.map, view.version, view.windowId)
 
     def __init__(self, attributes, device, useUiAutomator, windowId=None):
@@ -72,9 +72,8 @@ class View:
         self.logger = logging.getLogger("ViewClient.View")
         self.attributes = attributes
         """ The map that contains the C{attr},C{value} pairs """
-        self.adb = device.get_adb()
+        self.adb = device.adb
         """ adb connection to device """
-        # self.view_client = device.get_view_client()
         # """ viewclient connected to device """
         self.children = []
         """ The children of this View """
@@ -196,7 +195,6 @@ class View:
         Gets the L{View} class
         @return:  the L{View} class or C{None} if not defined
         """
-
         try:
             return self.attributes['class']
         except:
@@ -208,7 +206,6 @@ class View:
         @return: the L{View} C{Id} or C{None} if not defined
         @see: L{getUniqueId()}
         """
-
         try:
             return self.attributes['resource-id']
         except:
@@ -223,7 +220,6 @@ class View:
         """
         Gets the content description.
         """
-
         try:
             return self.attributes['content-desc']
         except:
@@ -233,7 +229,6 @@ class View:
         """
         Gets the tag.
         """
-
         try:
             return self.attributes[self.tagProperty]
         except:
@@ -243,7 +238,6 @@ class View:
         """
         Gets the parent.
         """
-
         return self.parent
 
     def getChildren(self):
@@ -257,7 +251,6 @@ class View:
         Gets the text attribute.
         @return: the text attribute or C{None} if not defined
         """
-
         try:
             return self.attributes[self.textProperty]
         except Exception:
@@ -301,7 +294,6 @@ class View:
         """
         Gets the View visibility
         """
-
         try:
             if self.attributes[GET_VISIBILITY_PROPERTY] == 'VISIBLE':
                 return VISIBLE
@@ -318,7 +310,6 @@ class View:
         """
         Gets the View X coordinate
         """
-
         return self.getXY()[0]
 
     def __getX(self):
@@ -650,7 +641,7 @@ class View:
         @param duration: duration in ms
         """
         (x, y) = self.getCenter()
-        self.adb.longTouch(x, y, duration)
+        self.adb.long_touch(x, y, duration)
 
     def allPossibleNamesWithColon(self, name):
         l = []
@@ -921,7 +912,7 @@ class UiScrollable(UiCollection):
         else:
             s = (self.x + self.w * self.swipeDeadZonePercentage, self.y + self.h / 2)
             e = (self.x + self.w * (1.0 - self.swipeDeadZonePercentage), self.y + self.h / 2)
-        self.adb.drag(s, e, self.duration, self.steps, self.adb.getOrientation())
+        self.adb.drag(s, e, self.duration, self.steps, self.adb.get_orientation())
 
     def flingForward(self):
         if self.vertical:
@@ -930,7 +921,7 @@ class UiScrollable(UiCollection):
         else:
             s = (self.x + self.w * (1.0 - self.swipeDeadZonePercentage), self.y + self.h / 2)
             e = (self.x + self.w * self.swipeDeadZonePercentage, self.y + self.h / 2)
-        self.adb.drag(s, e, self.duration, self.steps, self.adb.getOrientation())
+        self.adb.drag(s, e, self.duration, self.steps, self.adb.get_orientation())
 
     def flingToBeginning(self, maxSwipes=10):
         if self.vertical:
@@ -977,8 +968,8 @@ class UiScrollable(UiCollection):
     def setViewClient(self, vc):
         self.vc = vc
 
-# from com.dtmilano.android import viewclient
-class ViewClient:
+
+class ViewClient(Adapter):
     def __init__(self, device, forceviewserveruse=False,
                  localport=VIEW_SERVER_PORT, remoteport=VIEW_SERVER_PORT,
                  ignoreuiautomatorkilled=False, compresseddump=True):
@@ -1006,7 +997,7 @@ class ViewClient:
         if not device:
             raise Exception('Device is not connected')
         self.device = device
-        self.adb = device.get_adb()
+        self.adb = device.adb
 
         self.root = None
         """ The root node """
@@ -1046,6 +1037,19 @@ class ViewClient:
             self.textProperty = TEXT_PROPERTY_UI_AUTOMATOR
         else:
             self.useViewServer()
+
+    def connect(self):
+        if not self.useUiAutomator:
+            self.useViewServer()
+
+    def disconnect(self):
+        if not self.useUiAutomator:
+            try:
+                import subprocess
+                forward_remove_cmd = "adb -s %s forward --remove tcp:%d" % (self.device.serial, self.localPort)
+                subprocess.check_call(forward_remove_cmd.split())
+            except Exception as e:
+                print e.message
 
     def useViewServer(self):
         self.useUiAutomator = False
@@ -1129,7 +1133,7 @@ class ViewClient:
                 self.logger.warning("""ERROR: Some emulator images (i.e. android 4.1.2 API 16 generic_x86) does not include the '[' command.
 While UiAutomator back-end might be supported 'uiautomator' command fails.
 You should force ViewServer back-end.""")
-                self.logger.info("switching to viewserver")
+                self.logger.debug("switching to viewserver")
                 self.useViewServer()
                 return self.dump(window=window, sleep=sleep)
 
@@ -1197,9 +1201,6 @@ You should force ViewServer back-end.""")
                 self.setViews(received, hex(window)[2:])
 
         return self.views
-
-    def disconnect(self):
-        self.logger.info("disconnected")
 
     @staticmethod
     def setAlarm(timeout):
