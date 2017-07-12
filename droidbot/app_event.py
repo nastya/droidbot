@@ -34,7 +34,7 @@ POSSIBLE_KEYS = [
     "BACK",
     "MENU",
     "HOME",
-    "VOLUME_UP"
+    "VOLUME_UP",
     "VOLUME_DOWN"
 ]
 
