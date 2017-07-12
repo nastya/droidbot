@@ -616,6 +616,7 @@ class Device(object):
             self.logger.error('Failed to install app')
             os._exit(0)
 
+        package_name = app.get_package_name()
         dumpsys_p = subprocess.Popen(["adb", "-s", self.serial, "shell",
                                       "dumpsys", "package", package_name], stdout=subprocess.PIPE)
         dumpsys_lines = []
