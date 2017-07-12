@@ -59,6 +59,7 @@ class Device(object):
         self.ro_debuggable = None
         self.ro_secure = None
         self.is_connected = False
+        self.last_know_state = None
 
         # adapters
         self.adb = ADB(device=self)
@@ -92,12 +93,12 @@ class Device(object):
             adapter_name = adapter.__class__.__name__
             adapter_enabled = self.adapters[adapter]
             if not adapter_enabled:
-                print "[CONNECTIVITY] %s is not enabled." % adapter_name
+                print "[CONNECTION] %s is not enabled." % adapter_name
             else:
                 if adapter.check_connectivity():
-                    print "[CONNECTIVITY] %s is enabled and connected." % adapter_name
+                    print "[CONNECTION] %s is enabled and connected." % adapter_name
                 else:
-                    print "[CONNECTIVITY] %s is enabled but not connected." % adapter_name
+                    print "[CONNECTION] %s is enabled but not connected." % adapter_name
 
     def wait_for_device(self):
         """
@@ -107,12 +108,12 @@ class Device(object):
         self.logger.info("waiting for device")
         try:
             subprocess.check_call(["adb", "-s", self.serial, "wait-for-device"])
-            while True:
-                out = subprocess.check_output(["adb", "-s", self.serial, "shell",
-                                               "getprop", "init.svc.bootanim"]).split()[0]
-                if out == "stopped":
-                    break
-                time.sleep(3)
+            # while True:
+            #     out = subprocess.check_output(["adb", "-s", self.serial, "shell",
+            #                                    "getprop", "init.svc.bootanim"]).split()[0]
+            #     if out == "stopped":
+            #         break
+            #     time.sleep(1)
         except:
             self.logger.warning("error waiting for device")
 
@@ -615,7 +616,6 @@ class Device(object):
             self.logger.error('Failed to install app')
             os._exit(0)
 
-        package_name = app.get_package_name()
         dumpsys_p = subprocess.Popen(["adb", "-s", self.serial, "shell",
                                       "dumpsys", "package", package_name], stdout=subprocess.PIPE)
         dumpsys_lines = []
@@ -624,17 +624,15 @@ class Device(object):
             if not line:
                 break
             dumpsys_lines.append(line)
-
-        main_activity = self.__parse_main_activity_from_dumpsys_lines(dumpsys_lines)
-        self.logger.info("App installed: %s/%s" % (package_name, main_activity))
-
-        app.dumpsys_main_activity = main_activity
-
         if self.output_dir is not None:
             package_info_file_name = "%s/dumpsys_package_%s.txt" % (self.output_dir, app.get_package_name())
             package_info_file = open(package_info_file_name, "w")
             package_info_file.writelines(dumpsys_lines)
             package_info_file.close()
+        app.dumpsys_main_activity = self.__parse_main_activity_from_dumpsys_lines(dumpsys_lines)
+
+        self.logger.info("App installed: %s" % package_name)
+        self.logger.info("Main activity: %s" % app.get_main_activity())
 
     @staticmethod
     def __parse_main_activity_from_dumpsys_lines(lines):
@@ -804,7 +802,12 @@ class Device(object):
             self.logger.warning("exception in get_current_state: %s" % e)
             import traceback
             traceback.print_exc()
+        self.logger.info("finish getting current device state...")
+        self.last_know_state = current_state
         return current_state
+
+    def get_last_known_state(self):
+        return self.last_know_state
 
     def view_touch(self, x, y):
         self.adb.touch(x, y)
@@ -833,9 +836,15 @@ class Device(object):
         self.adb.press(key_code)
 
     def get_views(self):
-        if self.droidbot_app is not None:
+        if self.droidbot_app and self.adapters[self.droidbot_app]:
             views = self.droidbot_app.get_views()
-            if views is not None:
+            if views:
                 return views
 
-        return self.view_client.dump()
+        if self.view_client and self.adapters[self.view_client]:
+            views = self.view_client.dump()
+            if views:
+                return views
+
+        self.logger.warning("failed to get current views!")
+        return None
