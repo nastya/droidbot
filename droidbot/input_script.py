@@ -295,7 +295,7 @@ class ViewSelector(object):
         @return:
         """
         if 'text' in view_dict and 'resource_id' in view_dict \
-            and 'class' in view_dict and 'bounds' in view_dict:
+                and 'class' in view_dict and 'bounds' in view_dict:
             pass
         else:
             return False
@@ -423,11 +423,9 @@ class DroidBotOperation(object):
 
 class ScriptEvent(InputEvent):
     """
-    an event define in DroidBotScript
+    an event defined in DroidBotScript
+    the grammar of ScriptEvent is similar with the InputEvent in dict format
     """
-    # the grammar of ScriptEvent is similar with the AppEvent in dict format
-    event_grammar = {
-    }
 
     def __init__(self, event_dict):
         self.event_dict = event_dict
@@ -458,8 +456,7 @@ class ScriptEvent(InputEvent):
                 if matched_view is None:
                     device.logger.warning("target_view no match: %s" % target_view)
                 else:
-                    from device_state import DeviceState
-                    (event_dict['x'], event_dict['y']) = DeviceState.get_view_center(matched_view)
+                    event_dict['view'] = matched_view
         return InputEvent.from_dict(event_dict)
 
     def to_dict(self):

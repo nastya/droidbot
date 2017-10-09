@@ -1,4 +1,5 @@
 import subprocess
+import logging
 from adapter import Adapter
 
 
@@ -13,6 +14,8 @@ class UserInputMonitor(Adapter):
         initialize connection
         :param device: a Device instance
         """
+        self.logger = logging.getLogger(self.__class__.__name__)
+
         if device is None:
             from droidbot.device import Device
             device = Device()
@@ -37,7 +40,6 @@ class UserInputMonitor(Adapter):
         self.connected = False
         if self.process is not None:
             self.process.terminate()
-        print "[CONNECTION] %s is disconnected" % self.__class__.__name__
 
     def check_connectivity(self):
         return self.connected
@@ -59,6 +61,7 @@ class UserInputMonitor(Adapter):
 
         if f is not None:
             f.close()
+        print "[CONNECTION] %s is disconnected" % self.__class__.__name__
 
     def parse_line(self, getevent_line):
         pass

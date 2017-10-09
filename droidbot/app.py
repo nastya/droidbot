@@ -16,7 +16,7 @@ class App(object):
         :return:
         """
         assert app_path is not None
-        self.logger = logging.getLogger('App')
+        self.logger = logging.getLogger(self.__class__.__name__)
 
         self.app_path = app_path
 
@@ -33,6 +33,7 @@ class App(object):
         self.permissions = self.androguard.a.get_permissions()
         self.activities = None
         self.get_activities()
+        self.hashes = self.get_hashes()
 
     def get_androguard_analysis(self):
         """
@@ -88,7 +89,7 @@ class App(object):
         """
         get launch mode of an activity
         :param activity: the name of the activity
-        :return: 
+        :return str
         """
         activities = self.get_activities()
         if activities is None:

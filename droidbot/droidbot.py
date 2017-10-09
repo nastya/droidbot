@@ -5,13 +5,14 @@
 import logging
 import os
 import sys
+import pkg_resources
+import shutil
+from threading import Timer
 
 from device import Device
 from app import App
-from app_env import AppEnvManager
-from app_event import AppEventManager
+from env_manager import AppEnvManager
 from input_manager import InputManager
-from droidbox_scripts.droidbox import DroidBox
 
 
 class DroidBot(object):
@@ -24,26 +25,26 @@ class DroidBot(object):
     def __init__(self,
                  app_path=None,
                  device_serial=None,
+                 is_emulator=False,
                  output_dir=None,
                  env_policy=None,
                  policy_name=None,
-                 no_shuffle=False,
+                 random_input=False,
                  script_path=None,
                  event_count=None,
                  event_interval=None,
                  timeout=None,
                  keep_app=None,
-                 dont_tear_down=False,
-                 quiet=False,
-                 with_droidbox=False,
-                 use_hierarchy_viewer=False,
+                 keep_env=False,
+                 cv_mode=False,
+                 debug_mode=False,
                  profiling_method=None,
                  grant_perm=False):
         """
         initiate droidbot with configurations
         :return:
         """
-        logging.basicConfig(level=logging.WARNING if quiet else logging.INFO)
+        logging.basicConfig(level=logging.DEBUG if debug_mode else logging.INFO)
 
         self.logger = logging.getLogger('DroidBot')
         DroidBot.instance = self
@@ -52,15 +53,18 @@ class DroidBot(object):
         if output_dir is not None:
             if not os.path.isdir(output_dir):
                 os.mkdir(output_dir)
+            html_index_path = pkg_resources.resource_filename("droidbot", "resources/index.html")
+            stylesheets_path = pkg_resources.resource_filename("droidbot", "resources/stylesheets")
+            target_stylesheets_dir = os.path.join(output_dir, "stylesheets")
+            if os.path.exists(target_stylesheets_dir):
+                shutil.rmtree(target_stylesheets_dir)
+            shutil.copy(html_index_path, output_dir)
+            shutil.copytree(stylesheets_path, target_stylesheets_dir)
 
-        self.dont_tear_down = dont_tear_down
+        self.timeout = timeout
+        self.timer = None
+        self.keep_env = keep_env
         self.keep_app = keep_app
-
-        # if device_serial is None:
-        #     # Dirty Workaround: Set device_serial to Default='.*', because com/dtmilano/android/viewclient.py
-        #     #  set serial to an arbitrary argument. IN connectToDeviceOrExit(..) line 2539f.
-        #     # FIXED by requiring device_serial in cmd
-        #     device_serial = '.*'
 
         self.device = None
         self.app = None
@@ -72,13 +76,11 @@ class DroidBot(object):
 
         try:
             self.device = Device(device_serial=device_serial,
+                                 is_emulator=is_emulator,
                                  output_dir=self.output_dir,
-                                 use_hierarchy_viewer=use_hierarchy_viewer,
+                                 cv_mode=cv_mode,
                                  grant_perm=grant_perm)
             self.app = App(app_path, output_dir=self.output_dir)
-
-            if with_droidbox:
-                self.droidbox = DroidBox(droidbot=self, output_dir=self.output_dir)
 
             self.env_manager = AppEnvManager(device=self.device,
                                              app=self.app,
@@ -86,10 +88,9 @@ class DroidBot(object):
             self.input_manager = InputManager(device=self.device,
                                               app=self.app,
                                               policy_name=policy_name,
-                                              no_shuffle=no_shuffle,
+                                              random_input=random_input,
                                               event_count=event_count,
                                               event_interval=event_interval,
-                                              timeout=timeout,
                                               script_path=script_path,
                                               profiling_method=profiling_method)
         except Exception as e:
@@ -115,12 +116,26 @@ class DroidBot(object):
             return
         self.logger.info("Starting DroidBot")
         try:
+            if self.timeout > 0:
+                self.timer = Timer(self.timeout, self.stop)
+                self.timer.start()
+
             self.device.set_up()
+
+            if not self.enabled:
+                return
             self.device.connect()
 
+            if not self.enabled:
+                return
             self.device.install_app(self.app)
+
+            if not self.enabled:
+                return
             self.env_manager.deploy()
 
+            if not self.enabled:
+                return
             if self.droidbox is not None:
                 self.droidbox.set_apk(self.app.app_path)
                 self.droidbox.start_unblocked()
@@ -143,18 +158,21 @@ class DroidBot(object):
         self.logger.info("DroidBot Stopped")
 
     def stop(self):
-        if self.env_manager is not None:
+        self.enabled = False
+        if self.timer and self.timer.isAlive():
+            self.timer.cancel()
+        if self.env_manager:
             self.env_manager.stop()
-        if self.input_manager is not None:
+        if self.input_manager:
             self.input_manager.stop()
-        if self.droidbox is not None:
+        if self.droidbox:
             self.droidbox.stop()
-        self.device.disconnect()
-        if not self.dont_tear_down:
+        if self.device:
+            self.device.disconnect()
+        if not self.keep_env:
             self.device.tear_down()
         if not self.keep_app:
             self.device.uninstall_app(self.app)
-        self.enabled = False
 
 
 class DroidBotException(Exception):

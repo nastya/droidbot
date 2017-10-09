@@ -12,7 +12,7 @@ from adapter.minicap import Minicap
 from adapter.process_monitor import ProcessMonitor
 from adapter.telnet import TelnetConsole
 from adapter.user_input_monitor import UserInputMonitor
-from adapter.viewclient import ViewClient
+from adapter.droidbot_ime import DroidBotIme
 from app import App
 from intent import Intent
 
@@ -25,17 +25,16 @@ class Device(object):
     this class describes a connected device
     """
 
-    def __init__(self, device_serial=None, is_emulator=True, output_dir=None,
-                 use_hierarchy_viewer=False, grant_perm=False, telnet_auth_token=None):
+    def __init__(self, device_serial=None, is_emulator=False, output_dir=None,
+                 cv_mode=False, grant_perm=False, telnet_auth_token=None):
         """
         initialize a device connection
         :param device_serial: serial number of target device
         :param is_emulator: boolean, type of device, True for emulator, False for real device
         :return:
         """
-        self.logger = logging.getLogger("Device")
+        self.logger = logging.getLogger(self.__class__.__name__)
 
-        # options
         if device_serial is None:
             import utils
             all_devices = utils.get_available_devices()
@@ -45,6 +44,7 @@ class Device(object):
             device_serial = all_devices[0]
         self.serial = device_serial
         self.is_emulator = is_emulator
+        self.cv_mode = cv_mode
         self.output_dir = output_dir
         if output_dir is not None:
             if not os.path.isdir(output_dir):
@@ -54,36 +54,41 @@ class Device(object):
         # basic device information
         self.settings = {}
         self.display_info = None
+        self.model_number = None
         self.sdk_version = None
         self.release_version = None
         self.ro_debuggable = None
         self.ro_secure = None
-        self.is_connected = False
+        self.connected = True
         self.last_know_state = None
+        self.__used_ports = []
+        self.pause_sending_event = False
 
         # adapters
         self.adb = ADB(device=self)
         self.telnet = TelnetConsole(device=self, auth_token=telnet_auth_token)
-        self.view_client = ViewClient(device=self, forceviewserveruse=use_hierarchy_viewer)
         self.droidbot_app = DroidBotAppConn(device=self)
         self.minicap = Minicap(device=self)
         self.logcat = Logcat(device=self)
         self.user_input_monitor = UserInputMonitor(device=self)
         self.process_monitor = ProcessMonitor(device=self)
+        self.droidbot_ime = DroidBotIme(device=self)
 
         self.adapters = {
             self.adb: True,
             self.telnet: False,
-            self.view_client: False,
             self.droidbot_app: True,
             self.minicap: True,
             self.logcat: True,
             self.user_input_monitor: True,
-            self.process_monitor: True
+            self.process_monitor: True,
+            self.droidbot_ime: True
         }
 
-        # if self.is_emulator:
-        #     self.telnet_enabled = True
+        # minicap currently not working on emulators
+        if self.is_emulator:
+            self.logger.info("disable minicap on emulator")
+            self.adapters[self.minicap] = False
 
     def check_connectivity(self):
         """
@@ -120,7 +125,6 @@ class Device(object):
     def set_up(self):
         """
         Set connections on this device
-        :return: 
         """
         # wait for emulator to start
         self.wait_for_device()
@@ -149,14 +153,14 @@ class Device(object):
 
         self.unlock()
         self.check_connectivity()
-        self.is_connected = True
+        self.connected = True
 
     def disconnect(self):
         """
         disconnect current device
         :return:
         """
-        self.is_connected = False
+        self.connected = False
         for adapter in self.adapters:
             adapter_enabled = self.adapters[adapter]
             if not adapter_enabled:
@@ -194,6 +198,14 @@ class Device(object):
             return False
         return top_activity_name.startswith(package_name)
 
+    def get_model_number(self):
+        """
+        Get model number
+        """
+        if self.model_number is None:
+            self.model_number = self.adb.get_model_number()
+        return self.model_number
+
     def get_sdk_version(self):
         """
         Get version of current SDK
@@ -222,7 +234,7 @@ class Device(object):
 
     def get_display_info(self, refresh=True):
         """
-        get device display infomation, including width, height, and density
+        get device display information, including width, height, and density
         :param refresh: if set to True, refresh the display info instead of using the old values
         :return: dict, display_info
         """
@@ -264,14 +276,11 @@ class Device(object):
     def shake(self):
         """
         shake the device
-        :return: 
         """
+        # TODO the telnet-simulated shake event is not usable
         telnet = self.telnet
         if telnet is None:
             self.logger.warning("Telnet not connected, so can't shake the device.")
-        l2h = range(0, 11)
-        h2l = range(0, 11)
-        h2l.reverse()
         sensor_xyz = [(-float(v * 10) + 1, float(v) + 9.8, float(v * 2) + 0.5) for v in [1, -1, 1, -1, 1, -1, 0]]
         for (x, y, z) in sensor_xyz:
             telnet.run_cmd("sensor set acceleration %f:%f:%f" % (x, y, z))
@@ -374,7 +383,6 @@ class Device(object):
         :param y: float
         :return:
         """
-        assert self.telnet is not None
         return self.telnet.run_cmd("geo fix %s %s" % (x, y))
 
     def set_continuous_gps(self, center_x, center_y, delta_x, delta_y):
@@ -395,7 +403,7 @@ class Device(object):
         @param delta_y: range of y coordinate
         """
         import random
-        while self.is_connected:
+        while self.connected:
             x = random.random() * delta_x * 2 + center_x - delta_x
             y = random.random() * delta_y * 2 + center_y - delta_y
             self.set_gps(x, y)
@@ -446,7 +454,7 @@ class Device(object):
     def send_intent(self, intent):
         """
         send an intent to device via am (ActivityManager)
-        :param intent: instance of Intent
+        :param intent: instance of Intent or str
         :return:
         """
         assert self.adb is not None
@@ -463,7 +471,6 @@ class Device(object):
         :param event: the event to be sent
         :return:
         """
-        self.logger.info("sending event: %s" % event)
         event.send(self)
 
     def start_app(self, app):
@@ -493,33 +500,35 @@ class Device(object):
         m = regex.search(data[1])
         if m:
             return m.group(1) + "/" + m.group(2)
+        self.logger.warning("Unable to get top activity name.")
         return None
 
     def get_current_activity_stack(self):
         """
         Get current activity stack
-        :return: 
+        :return: a list of str, each str is an activity name, the first is the top activity name
         """
-        tasks = self.get_task_activities()
-        current_task_id = tasks['current_task']
-        if current_task_id in tasks:
-            return tasks['task_to_activities'][current_task_id]
+        task_to_activities = self.get_task_activities()
+        top_activity = self.get_top_activity_name()
+        if top_activity:
+            for task_id in task_to_activities:
+                activities = task_to_activities[task_id]
+                if len(activities) > 0 and activities[0] == top_activity:
+                    return activities
+            self.logger.warning("Unable to get current activity stack.")
+            return [top_activity]
+        else:
+            return None
 
     def get_task_activities(self):
         """
         Get current tasks and corresponding activities.
-        :return: a dict with three attributes: task_to_activities, current_task, and top_activity.
-        task_to_activities is a dict mapping a task id to a list of activities, from top to down.
-        current_task is the id of the active task.
-        top_activity is the name of the top activity
+        :return: a dict mapping each task id to a list of activities, from top to down.
         """
-        lines = self.adb.shell("dumpsys activity activities").splitlines()
-
-        result = {}
         task_to_activities = {}
 
+        lines = self.adb.shell("dumpsys activity activities").splitlines()
         activity_line_re = re.compile('\* Hist #\d+: ActivityRecord{[^ ]+ [^ ]+ ([^ ]+) t(\d+)}')
-        focused_activity_line_re = re.compile('mFocusedActivity: ActivityRecord{[^ ]+ [^ ]+ ([^ ]+) t(\d+)}')
 
         for line in lines:
             line = line.strip()
@@ -534,16 +543,8 @@ class Device(object):
                     if task_id not in task_to_activities:
                         task_to_activities[task_id] = []
                     task_to_activities[task_id].append(activity)
-            elif line.startswith("mFocusedActivity: "):
-                m = focused_activity_line_re.match(line)
-                if m:
-                    activity = m.group(1)
-                    task_id = m.group(2)
-                    result['current_task'] = task_id
-                    result['top_activity'] = activity
 
-        result['task_to_activities'] = task_to_activities
-        return result
+        return task_to_activities
 
     def get_service_names(self):
         """
@@ -562,9 +563,6 @@ class Device(object):
                 service = m.group(2)
                 services.append("%s/%s" % (package, service))
         return services
-
-    def get_focused_window_name(self):
-        return self.adb.get_focused_window_name()
 
     def get_package_path(self, package_name):
         """
@@ -602,21 +600,19 @@ class Device(object):
 
         # subprocess.check_call(["adb", "-s", self.serial, "uninstall", app.get_package_name()],
         #                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        install_cmd = ["adb", "-s", self.serial, "install", "-r"]
-        if self.grant_perm:
-            install_cmd.append("-g")
-        install_cmd.append(app.app_path)
-        try:
-            subprocess.check_call(["adb", "-s", self.serial, "uninstall", app.get_package_name()],
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            subprocess.check_call(install_cmd,
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        except subprocess.CalledProcessError:
-            self.logger.error('Failed to install app')
-            os._exit(0)
-
         package_name = app.get_package_name()
+        if package_name not in self.adb.get_installed_apps():
+            install_cmd = ["adb", "-s", self.serial, "install", "-r"]
+            if self.grant_perm and self.get_sdk_version() >= 23:
+                install_cmd.append("-g")
+            install_cmd.append(app.app_path)
+            install_p = subprocess.Popen(install_cmd, stdout=subprocess.PIPE)
+            while self.connected and package_name not in self.adb.get_installed_apps():
+                print "Please wait while installing the app..."
+                time.sleep(2)
+            if not self.connected:
+                install_p.terminate()
+                return
         dumpsys_p = subprocess.Popen(["adb", "-s", self.serial, "shell",
                                       "dumpsys", "package", package_name], stdout=subprocess.PIPE)
         dumpsys_lines = []
@@ -688,14 +684,18 @@ class Device(object):
         """
         Uninstall an app from device.
         :param app: an instance of App or a package name
-        :return: 
         """
         if isinstance(app, App):
             package_name = app.get_package_name()
         else:
             package_name = app
         if package_name in self.adb.get_installed_apps():
-            subprocess.check_call(["adb", "-s", self.serial, "uninstall", package_name], stdout=subprocess.PIPE)
+            uninstall_cmd = ["adb", "-s", self.serial, "uninstall", package_name]
+            uninstall_p = subprocess.Popen(uninstall_cmd, stdout=subprocess.PIPE)
+            while package_name in self.adb.get_installed_apps():
+                print "Please wait while uninstalling the app..."
+                time.sleep(2)
+            uninstall_p.terminate()
 
     def get_app_pid(self, app):
         if isinstance(app, App):
@@ -765,28 +765,27 @@ class Device(object):
         if not os.path.exists(local_image_dir):
             os.mkdir(local_image_dir)
 
-        if self.minicap is not None:
-            last_screen = self.minicap.last_screen
-            if last_screen is not None:
-                local_image_path = os.path.join(local_image_dir, "screen_%s.jpg" % tag)
-                f = open(local_image_path, 'w')
-                f.write(last_screen)
-                f.close()
-                return local_image_path
-
-        local_image_path = os.path.join(local_image_dir, "screen_%s.png" % tag)
-        remote_image_path = "/sdcard/screen_%s.png" % tag
-        self.adb.shell("screencap -p %s" % remote_image_path)
-        self.pull_file(remote_image_path, local_image_path)
-        self.adb.shell("rm %s" % remote_image_path)
+        if self.adapters[self.minicap] and self.minicap.last_screen:
+            # minicap use jpg format
+            local_image_path = os.path.join(local_image_dir, "screen_%s.jpg" % tag)
+            with open(local_image_path, 'w') as local_image_file:
+                local_image_file.write(self.minicap.last_screen)
+            return local_image_path
+        else:
+            # screencap use png format
+            local_image_path = os.path.join(local_image_dir, "screen_%s.png" % tag)
+            remote_image_path = "/sdcard/screen_%s.png" % tag
+            self.adb.shell("screencap -p %s" % remote_image_path)
+            self.pull_file(remote_image_path, local_image_path)
+            self.adb.shell("rm %s" % remote_image_path)
 
         return local_image_path
 
     def get_current_state(self):
-        self.logger.info("getting current device state...")
+        self.logger.debug("getting current device state...")
         current_state = None
         try:
-            view_client_views = self.get_views()
+            views = self.get_views()
             foreground_activity = self.get_top_activity_name()
             activity_stack = self.get_current_activity_stack()
             background_services = self.get_service_names()
@@ -794,7 +793,7 @@ class Device(object):
             self.logger.debug("finish getting current device state...")
             from device_state import DeviceState
             current_state = DeviceState(self,
-                                        view_client_views=view_client_views,
+                                        views=views,
                                         foreground_activity=foreground_activity,
                                         activity_stack=activity_stack,
                                         background_services=background_services,
@@ -803,8 +802,10 @@ class Device(object):
             self.logger.warning("exception in get_current_state: %s" % e)
             import traceback
             traceback.print_exc()
-        self.logger.info("finish getting current device state...")
+        self.logger.debug("finish getting current device state...")
         self.last_know_state = current_state
+        if not current_state:
+            self.logger.warning("Failed to get current state!")
         return current_state
 
     def get_last_known_state(self):
@@ -830,22 +831,63 @@ class Device(object):
         """
         self.adb.drag((x0, y0), (x1, y1), duration)
 
-    def view_input_text(self, text):
-        self.adb.type(text)
+    def view_append_text(self, text):
+        if self.droidbot_ime.connected:
+            self.droidbot_ime.input_text(text=text, mode=1)
+        else:
+            self.adb.type(text)
+
+    def view_set_text(self, text):
+        if self.droidbot_ime.connected:
+            self.droidbot_ime.input_text(text=text, mode=0)
+        else:
+            self.logger.warning("`adb shell input text` doesn't support setting text, appending instead.")
+            self.adb.type(text)
 
     def key_press(self, key_code):
         self.adb.press(key_code)
 
     def get_views(self):
+        if self.cv_mode and self.adapters[self.minicap]:
+            # Get views using cv module
+            views = self.minicap.get_views()
+            if views:
+                return views
+            else:
+                self.logger.warning("Failed to get views using OpenCV.")
         if self.droidbot_app and self.adapters[self.droidbot_app]:
             views = self.droidbot_app.get_views()
             if views:
                 return views
-
-        if self.view_client and self.adapters[self.view_client]:
-            views = self.view_client.dump()
-            if views:
-                return views
+            else:
+                self.logger.warning("Failed to get views using Accessibility.")
 
         self.logger.warning("failed to get current views!")
         return None
+
+    def get_random_port(self):
+        """
+        get a random port on host machine to establish connection
+        :return: a port number
+        """
+        import socket
+        temp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        temp_sock.bind(("", 0))
+        port = temp_sock.getsockname()[1]
+        temp_sock.close()
+        if port in self.__used_ports:
+            return self.get_random_port()
+        self.__used_ports.append(port)
+        return port
+
+    def handle_rotation(self):
+        if not self.adapters[self.minicap]:
+            return
+        self.pause_sending_event = True
+        if self.minicap.check_connectivity():
+            self.minicap.disconnect()
+            self.minicap.connect()        
+
+        if self.minicap.check_connectivity():
+            print "[CONNECTION] %s is reconnected." % self.minicap.__class__.__name__
+        self.pause_sending_event = False

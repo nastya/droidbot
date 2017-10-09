@@ -2,17 +2,15 @@ import json
 import logging
 import subprocess
 import time
-from threading import Timer
 
 from input_event import EventLog
-from input_policy import UtgBasedInputPolicy, UtgDfsPolicy
+from input_policy import UtgBasedInputPolicy, UtgNaiveSearchPolicy, UtgGreedySearchPolicy, \
+                         ManualPolicy, \
+                         POLICY_NAIVE_DFS, POLICY_GREEDY_DFS, \
+                         POLICY_NAIVE_BFS, POLICY_GREEDY_BFS, \
+                         POLICY_MANUAL, POLICY_MONKEY, POLICY_NONE
 
-POLICY_NONE = "none"
-POLICY_MONKEY = "monkey"
-POLICY_DFS = "dfs"
-POLICY_MANUAL = "manual"
-
-DEFAULT_POLICY = POLICY_DFS
+DEFAULT_POLICY = POLICY_GREEDY_DFS
 DEFAULT_EVENT_INTERVAL = 1
 DEFAULT_EVENT_COUNT = 1000
 DEFAULT_TIMEOUT = -1
@@ -27,14 +25,15 @@ class InputManager(object):
     This class manages all events to send during app running
     """
 
-    def __init__(self, device, app, policy_name, no_shuffle,
-                 event_count, event_interval, timeout,
+    def __init__(self, device, app, policy_name, random_input,
+                 event_count, event_interval,
                  script_path=None, profiling_method=None):
         """
         manage input event sent to the target device
         :param device: instance of Device
         :param app: instance of App
         :param policy_name: policy of generating events, string
+        :param cv_mode: whether run in cv mode
         :return:
         """
         self.logger = logging.getLogger('InputEventManager')
@@ -43,16 +42,14 @@ class InputManager(object):
         self.device = device
         self.app = app
         self.policy_name = policy_name
-        self.no_shuffle = no_shuffle
+        self.random_input = random_input
         self.events = []
         self.policy = None
         self.script = None
         self.event_count = event_count
         self.event_interval = event_interval
-        self.timeout = timeout
 
         self.monkey = None
-        self.timer = None
 
         if script_path is not None:
             f = open(script_path, 'r')
@@ -69,11 +66,14 @@ class InputManager(object):
             input_policy = None
         elif self.policy_name == POLICY_MONKEY:
             input_policy = None
-        elif self.policy_name == POLICY_DFS:
-            input_policy = UtgDfsPolicy(device, app, self.no_shuffle)
-        # elif self.policy_name == POLICY_MANUAL:
-        #     input_policy = ManualEventFactory(device, app)
+        elif self.policy_name in [POLICY_NAIVE_DFS, POLICY_NAIVE_BFS]:
+            input_policy = UtgNaiveSearchPolicy(device, app, self.random_input, self.policy_name)
+        elif self.policy_name in [POLICY_GREEDY_DFS, POLICY_GREEDY_BFS]:
+            input_policy = UtgGreedySearchPolicy(device, app, self.random_input, self.policy_name)
+        elif self.policy_name == POLICY_MANUAL:
+            input_policy = ManualPolicy(device, app)
         else:
+            self.logger.warning("No valid input policy specified. Using policy \"none\".")
             input_policy = None
         if isinstance(input_policy, UtgBasedInputPolicy):
             input_policy.script = self.script
@@ -90,23 +90,18 @@ class InputManager(object):
         self.events.append(event)
 
         event_log = EventLog(self.device, self.app, event, self.profiling_method)
-        if self.profiling_method is not None:
-            event_log.start_profiling()
-        self.device.send_event(event)
-        time.sleep(self.event_interval)
-        if self.profiling_method is not None:
-            event_log.stop_profiling()
-        event_log.save2dir()
+        event_log.start()
+        while True:
+            time.sleep(self.event_interval)
+            if not self.device.pause_sending_event:
+                break
+        event_log.stop()
 
     def start(self):
         """
         start sending event
         """
         self.logger.info("start sending events, policy is %s" % self.policy_name)
-
-        if self.timeout > 0:
-            self.timer = Timer(self.timeout, self.stop)
-            self.timer.start()
 
         try:
             if self.policy is not None:
@@ -155,7 +150,4 @@ class InputManager(object):
             pid = self.device.get_app_pid("com.android.commands.monkey")
             if pid is not None:
                 self.device.adb.shell("kill -9 %d" % pid)
-        if self.timer and self.timer.isAlive():
-            self.timer.cancel()
-            self.timer = None
         self.enabled = False
