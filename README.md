@@ -43,7 +43,7 @@ If successfully installed, you should be able to execute `droidbot -h`.
     
 ## Usage with DroidBox
 
-1. Run Android emulator with DroidBox-patched Android4.1 (see instructions on https://github.com/pjlantz/droidbox).
+1. Run Android emulator with DroidBox-patched Android4.1 (see instructions on https://github.com/pjlantz/droidbox; need to run ./startemu.sh <avd_name>).
 
 2. Start DroidBot with -use_with_droidbox key, e.g.:
 
