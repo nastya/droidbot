@@ -1179,13 +1179,31 @@ You should force ViewServer back-end.""")
             s.send(cmd)
             received = ""
             doneRE = re.compile("DONE")
-            ViewClient.setAlarm(120)
+            numit = 0
             while True:
+                numit += 1
                 received += s.recv(1024)
+                if numit >= 5 and received == '':
+                    self.logger.info("Retrying connection to server")
+                    s.close()
+                    time.sleep(3)
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    time.sleep(3)
+                    try:
+                        s.connect((VIEW_SERVER_HOST, self.localPort))
+                        time.sleep(5)
+                    except socket.error, ex:
+                        raise RuntimeError("ERROR: Connecting to %s:%d: %s" % (VIEW_SERVER_HOST, self.localPort, ex))
+                    s.send(cmd)
+                    time.sleep(3)
+                if numit >= 10 and received == '':
+                    self.logger.info("Did not manage to get ViewClient response")
+                    break
                 if doneRE.search(received[-7:]):
                     break
+                if numit >= 100:
+                    break
             s.close()
-            ViewClient.setAlarm(0)
             if received:
                 for c in received:
                     if ord(c) > 127:
