@@ -214,6 +214,7 @@ class DroidBox(object):
         self.is_counting_logs = True
         self.lastScreenshot = 0
         first_log_time = None
+        self.analysisStart = None
 
         fd2path = {}
 
@@ -237,6 +238,7 @@ class DroidBox(object):
                 log_time = log_data['datetime']
                 if first_log_time is None:
                     first_log_time = log_time
+                    self.analysisStart = str(first_log_time)
                 log_delta_seconds = (log_time - first_log_time).total_seconds()
 
                 log_content = json.loads(decode(log_data['content'][10:]))
@@ -298,6 +300,7 @@ class DroidBox(object):
         output["hashes"] = self.apk_hashes
         output["apkName"] = self.apk_name
         output["sensitiveBehaviors"] = self.sensitive_behaviors
+        output["analysisStart"] = self.analysisStart
         return output
 
     def get_counts(self):
