@@ -849,8 +849,10 @@ class AppEventManager(object):
             event_log.stop_profiling()
             event_log.save2dir()
         else:
+            event_log = EventLog(self.device, self.app, event, self.profiling_method)
             self.device.send_event(event)
             time.sleep(self.event_interval)
+            event_log.save2dir()
 
     def dump(self):
         """
