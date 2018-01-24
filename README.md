@@ -40,6 +40,19 @@ If successfully installed, you should be able to execute `droidbot -h`.
     ```
     droidbot -d <serial> -a <path_to_apk> -event dfs
     ```
+    
+## Usage with DroidBox
+
+1. Run Android emulator with DroidBox-patched Android4.1 (see instructions on https://github.com/pjlantz/droidbox).
+
+2. Start DroidBot with -use_with_droidbox key, e.g.:
+
+    ```
+    droidbot -d <serial> -a <path_to_apk> -o <output_dir> -policy <policy> -count <events_count> -use_with_droidbox
+    ```
+
+3. See DroidBox logs in output_dir/analysis.json.
+
 
 ## Test strategy
 
