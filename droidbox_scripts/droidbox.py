@@ -125,9 +125,9 @@ class DroidBox(object):
             sys.exit(1)
 
         # Execute the application
-        call(["adb", "logcat", "-c"])
+        call(["adb", "-s", self.droidbot.device.serial, "logcat", "-c"])
         ret = call(['monkeyrunner', 'monkeyrunner.py', apk_name,
-                    package_name, main_activity], stderr=PIPE,
+                    package_name, main_activity, self.droidbot.device.serial], stderr=PIPE,
                    cwd=os.path.dirname(os.path.realpath(__file__)))
 
         if ret == 1:
@@ -142,7 +142,7 @@ class DroidBox(object):
 
         # Open the adb logcat
         if self.logcat is None:
-            self.logcat = Popen(["adb", "logcat", "-v", "threadtime", "DroidBox:W", "dalvikvm:W", "ActivityManager:I"],
+            self.logcat = Popen(["adb", "-s", self.droidbot.device.serial, "logcat", "-v", "threadtime", "DroidBox:W", "dalvikvm:W", "ActivityManager:I"],
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE)
 
@@ -188,8 +188,8 @@ class DroidBox(object):
         # curses.setupterm()
         # sys.stdout.write(curses.tigetstr("clear"))
         sys.stdout.flush()
-        call(["adb", "wait-for-device"])
-        call(['adb', 'logcat', '-c'])
+        call(["adb", "-s", self.droidbot.device.serial, "wait-for-device"])
+        call(['adb', "-s", self.droidbot.device.serial, 'logcat', '-c'])
 
         print " ____                        __  ____"
         print "/\  _`\               __    /\ \/\  _`\\"
@@ -207,7 +207,7 @@ class DroidBox(object):
             self.timer.start()
 
         if self.logcat is None:
-            self.logcat = Popen(["adb", "logcat", "-v", "threadtime", "DroidBox:W", "dalvikvm:W", "ActivityManager:I"],
+            self.logcat = Popen(["adb",  "-s", self.droidbot.device.serial, "logcat", "-v", "threadtime", "DroidBox:W", "dalvikvm:W", "ActivityManager:I"],
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
         # Collect DroidBox logs
@@ -222,7 +222,7 @@ class DroidBox(object):
             try:
                 if self.output_dir and (time.time() - self.lastScreenshot) >= 5:
                     # Take screenshots every 5 seconds.
-                    os.system("adb shell screencap -p | sed 's/\r$//' > %s" % os.path.join(self.output_dir, "screen") \
+                    os.system("adb -s " + self.droidbot.device.serial + " shell screencap -p | sed 's/\r$//' > %s" % os.path.join(self.output_dir, "screen") \
                               + "_$(date +%Y-%m-%d_%H%M%S).png")
                     self.lastScreenshot = time.time()
 

@@ -27,6 +27,7 @@ import logging
 apkName = sys.argv[1]
 package = sys.argv[2]
 activity = sys.argv[3]
+device_serial = sys.argv[4]
 
 device = None
 
@@ -35,7 +36,7 @@ device = None
 while device == None:
 	try:
 		print("Waiting for the device...")
-		device = MonkeyRunner.waitForConnection(3)
+		device = MonkeyRunner.waitForConnection(3, device_serial)
 	except:
 		pass
 
@@ -55,7 +56,7 @@ else:
 print("Running the component %s..." % (runComponent))
 
 # Runs the component
-p = subprocess.Popen(["adb", "shell", "am", "start", "-n", runComponent], stdout=subprocess.PIPE)
+p = subprocess.Popen(["adb",  "-s", device_serial, "shell", "am", "start", "-n", runComponent], stdout=subprocess.PIPE)
 out, err = p.communicate()
 
 #Activity not started?
