@@ -127,7 +127,7 @@ class DroidBox(object):
         # Execute the application
         call(["adb", "-s", self.droidbot.device.serial, "logcat", "-c"])
         ret = call(['monkeyrunner', 'monkeyrunner.py', apk_name,
-                    package_name, main_activity, self.droidbot.device.serial], stderr=PIPE,
+                    package_name, main_activity, self.droidbot.device.serial], stderr=None,
                    cwd=os.path.dirname(os.path.realpath(__file__)))
 
         if ret == 1:

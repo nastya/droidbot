@@ -606,14 +606,15 @@ class Device(object):
         @return:
         """
         assert isinstance(app, App)
-        subprocess.check_call(["adb", "-s", self.serial, "uninstall", app.get_package_name()],
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        p = subprocess.Popen(["adb", "-s", self.serial, "uninstall", app.get_package_name()], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = p.communicate()
 
         install_cmd = ["adb", "-s", self.serial, "install"]
         if self.grant_perm:
             install_cmd.append("-g")
         install_cmd.append(app.app_path)
-        subprocess.check_call(install_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        p = subprocess.Popen(install_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = p.communicate()
 
         if self.output_dir is not None:
             package_info_file_name = "%s/dumpsys_package_%s.txt" % (self.output_dir, app.get_package_name())
@@ -621,16 +622,17 @@ class Device(object):
         else:
             package_info_file = subprocess.PIPE
 
-        subprocess.check_call(["adb", "-s", self.serial, "shell", "dumpsys", "package",
-                               app.get_package_name()], stdout=package_info_file)
+        p = subprocess.Popen(["adb", "-s", self.serial, "shell", "dumpsys", "package",
+                               app.get_package_name()], stdout=package_info_file, stderr=subprocess.PIPE)
+        out, err = p.communicate()
 
         if isinstance(package_info_file, file):
             package_info_file.close()
 
     def uninstall_app(self, app):
         assert isinstance(app, App)
-        subprocess.check_call(["adb", "-s", self.serial, "uninstall", app.get_package_name()],
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        p = subprocess.Popen(["adb", "-s", self.serial, "uninstall", app.get_package_name()], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = p.communicate()
 
     def get_app_pid(self, app):
         package = app.get_package_name()
