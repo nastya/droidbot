@@ -163,7 +163,7 @@ class DroidBox(object):
             print("Analysis has not been done.")
             # Kill ADB, otherwise it will never terminate
             os.kill(self.logcat.pid, signal.SIGTERM)
-            sys.exit(1)
+            os._exit(1)
 
         print("Application started")
 
