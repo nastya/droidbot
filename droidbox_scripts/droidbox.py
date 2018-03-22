@@ -138,7 +138,6 @@ class DroidBox(object):
 
         # By default the application has not started
         self.applicationStarted = 0
-        stringApplicationStarted = "Start proc %s" % package_name
 
         # Open the adb logcat
         if self.logcat is None:
@@ -154,7 +153,7 @@ class DroidBox(object):
                     raise Exception("We have lost the connection with ADB.")
 
                 # Application started?
-                if (stringApplicationStarted in logcatInput):
+                if 'Start proc' in logcatInput and package_name in logcatInput:
                     self.applicationStarted = 1
                     break
             except:
