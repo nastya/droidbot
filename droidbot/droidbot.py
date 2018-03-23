@@ -13,7 +13,7 @@ from device import Device
 from app import App
 from env_manager import AppEnvManager
 from input_manager import InputManager
-
+from droidbox_scripts.droidbox import DroidBox
 
 class DroidBot(object):
     """
@@ -41,7 +41,8 @@ class DroidBot(object):
                  profiling_method=None,
                  grant_perm=False,
                  enable_accessibility_hard=False,
-                 master=None):
+                 master=None,
+                 with_droidbox=False):
         """
         initiate droidbot with configurations
         :return:
@@ -85,6 +86,9 @@ class DroidBot(object):
                                  grant_perm=grant_perm,
                                  enable_accessibility_hard=self.enable_accessibility_hard)
             self.app = App(app_path, output_dir=self.output_dir)
+            
+            if with_droidbox:
+                self.droidbox = DroidBox(droidbot=self, output_dir=self.output_dir)
 
             self.env_manager = AppEnvManager(device=self.device,
                                              app=self.app,

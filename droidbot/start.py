@@ -87,6 +87,8 @@ def parse_args():
                         help="Declare the target device to be an emulator, which would be treated specially by DroidBot.")
     parser.add_argument("-accessibility_auto", action="store_true", dest="enable_accessibility_hard",
                         help="Enable the accessibility service automatically even though it might require device restart\n(can be useful for Android API level < 23).")
+    parser.add_argument("-use_with_droidbox", action="store_true", dest="with_droidbox",
+                        help="Use DroidBot with DroidBox. Need to run on a DroidBox emulator.")
     options = parser.parse_args()
     # print options
     return options
@@ -134,7 +136,8 @@ def main():
                                   grant_perm=opts.grant_perm,
                                   enable_accessibility_hard=opts.enable_accessibility_hard,
                                   qemu_hda=opts.qemu_hda,
-                                  qemu_no_graphic=opts.qemu_no_graphic)
+                                  qemu_no_graphic=opts.qemu_no_graphic,
+                                  with_droidbox=opts.with_droidbox)
         droidmaster.start()
     else:
         droidbot = DroidBot(app_path=opts.apk_path,
@@ -156,7 +159,8 @@ def main():
                             profiling_method=opts.profiling_method,
                             grant_perm=opts.grant_perm,
                             enable_accessibility_hard=opts.enable_accessibility_hard,
-                            master=opts.master)
+                            master=opts.master,
+                            with_droidbox=opts.with_droidbox)
         droidbot.start()
     return
 
