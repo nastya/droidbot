@@ -26,7 +26,7 @@ class Device(object):
     """
 
     def __init__(self, device_serial=None, is_emulator=False, output_dir=None,
-                 cv_mode=False, grant_perm=False, telnet_auth_token=None):
+                 cv_mode=False, grant_perm=False, telnet_auth_token=None, enable_accessibility_hard=False):
         """
         initialize a device connection
         :param device_serial: serial number of target device
@@ -50,6 +50,7 @@ class Device(object):
             if not os.path.isdir(output_dir):
                 os.mkdir(output_dir)
         self.grant_perm = grant_perm
+        self.enable_accessibility_hard = enable_accessibility_hard
 
         # basic device information
         self.settings = {}
@@ -495,7 +496,7 @@ class Device(object):
         """
         Get current activity
         """
-        data = self.adb.shell("dumpsys activity top").splitlines()
+        data = self.adb.shell("dumpsys activity top").split("\n")
         regex = re.compile("\s*ACTIVITY ([A-Za-z0-9_.]+)/([A-Za-z0-9_.]+)")
         if (len(data) >= 2):
             m = regex.search(data[1])
@@ -705,7 +706,7 @@ class Device(object):
             package = app
 
         name2pid = {}
-        ps_out = self.adb.shell(["ps", "-t"])
+        ps_out = self.adb.shell(["ps"])
         ps_out_lines = ps_out.splitlines()
         ps_out_head = ps_out_lines[0].split()
         if ps_out_head[1] != "PID" or ps_out_head[-1] != "NAME":
@@ -887,7 +888,7 @@ class Device(object):
         self.pause_sending_event = True
         if self.minicap.check_connectivity():
             self.minicap.disconnect()
-            self.minicap.connect()        
+            self.minicap.connect()
 
         if self.minicap.check_connectivity():
             print "[CONNECTION] %s is reconnected." % self.minicap.__class__.__name__
