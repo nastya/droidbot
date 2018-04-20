@@ -73,10 +73,14 @@ class ProcessMonitor(Adapter):
             try:
                 ps_out = subprocess.check_output(ps_cmd)
             except subprocess.CalledProcessError:
+                self.device.logger.warning('ps command failed')
                 continue
 
             # parse ps_out to update self.pid2uid mapping and self.pid2name mapping
             ps_out_lines = ps_out.splitlines()
+            if len(ps_out_lines) == 0:
+                self.device.logger.warning('ps command failed')
+                return
             ps_out_head = ps_out_lines[0].split()
             if ps_out_head[0] != "USER" or ps_out_head[1] != "PID" \
                     or ps_out_head[2] != "PPID" or ps_out_head[-1] != "NAME":
