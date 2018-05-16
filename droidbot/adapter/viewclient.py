@@ -1182,7 +1182,10 @@ You should force ViewServer back-end.""")
             numit = 0
             while True:
                 numit += 1
-                received += s.recv(1024)
+                try:
+                    received += s.recv(1024)
+                except:
+                    break
                 if numit >= 5 and received == '':
                     self.logger.info("Retrying connection to server")
                     s.close()
@@ -1209,6 +1212,8 @@ You should force ViewServer back-end.""")
                     if ord(c) > 127:
                         received = unicode(received, encoding='utf-8', errors='replace')
                         break
+            if received == '':
+                return None
             if window == -1:
                 self.setViews(received)
             else:

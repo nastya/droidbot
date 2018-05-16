@@ -969,6 +969,8 @@ class EventFactory(object):
                     event = IntentEvent(self.app.get_start_intent())
                 else:
                     event = self.generate_event()
+                if event is None:
+                    break
                 event_manager.add_event(event)
             except KeyboardInterrupt:
                 break
@@ -1050,12 +1052,18 @@ class StateBasedEventFactory(EventFactory):
         @return:
         """
 
-        # Get current device state
-        if state is None:
-            state = self.device.get_current_state()
+        try:
+            # Get current device state
+            if state is None:
+                state = self.device.get_current_state()
 
-        state.save2dir()
-        event = None
+            state.save2dir()
+            if state is None:
+                self.device.logger.info("Did not manage to get device state. Stopping the analysis.")
+                return None
+            event = None
+        except:
+            return None
 
         # if the previous operation is not finished, continue
         if len(self.script_events) != 0:

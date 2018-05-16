@@ -547,6 +547,8 @@ class Device(object):
         """
         data = self.get_adb().shell("dumpsys activity top").splitlines()
         regex = re.compile("\s*ACTIVITY ([A-Za-z0-9_.]+)/([A-Za-z0-9_.]+)")
+        if len(data) <= 1:
+            return None
         m = regex.search(data[1])
         if m:
             return m.group(1) + "/" + m.group(2)
@@ -713,6 +715,8 @@ class Device(object):
         current_state = None
         try:
             view_client_views = self.dump_views()
+            if view_client_views is None:
+                return None
             foreground_activity = self.get_top_activity_name()
             background_services = self.get_service_names()
             screenshot_path = self.take_screenshot()
