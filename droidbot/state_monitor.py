@@ -5,6 +5,7 @@
 #     3. process state, i.e. pid-uid-package_name mapping
 __author__ = 'liyc'
 import threading
+import time
 
 
 class StateMonitor(object):
@@ -55,6 +56,7 @@ class StateMonitor(object):
         gps_thread = threading.Thread(
             target=self.maintain_process_mapping)
         gps_thread.start()
+        time.sleep(2)
         return True
 
     def stop(self):
@@ -80,8 +82,9 @@ class StateMonitor(object):
             # parse ps_out to update self.pid2uid mapping and self.pid2name mapping
             ps_out_lines = ps_out.splitlines()
             if len(ps_out_lines) == 0:
-                self.device.logger.warning('ps command failed')
-                return
+                self.device.logger.warning('ps command failed, no lines')
+                time.sleep(0.3)
+                continue
             ps_out_head = ps_out_lines[0].split()
             if ps_out_head[0] != "USER" or ps_out_head[1] != "PID" \
                     or ps_out_head[2] != "PPID" or ps_out_head[-1] != "NAME":
