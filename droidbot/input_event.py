@@ -424,6 +424,9 @@ class TouchEvent(UIEvent):
         return True
 
     def get_event_str(self, state):
+        if state is None:
+            msg = "Invalid %s!" % self.__class__.__name__
+            raise InvalidEventException(msg)
         if self.view is not None:
             return "%s(state=%s, view=%s)" % (self.__class__.__name__, state.state_str, self.view['view_str'])
         elif self.x is not None and self.y is not None:

@@ -498,6 +498,9 @@ class Device(object):
         """
         data = self.adb.shell("dumpsys activity top").split("\n")
         regex = re.compile("\s*ACTIVITY ([A-Za-z0-9_.]+)/([A-Za-z0-9_.]+)")
+        if len(data) < 2:
+            self.logger.warning("Empty output of dumpsys activity top")
+            return None
         m = regex.search(data[1])
         if m:
             return m.group(1) + "/" + m.group(2)
