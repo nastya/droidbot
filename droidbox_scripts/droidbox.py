@@ -261,7 +261,8 @@ class DroidBox(object):
                     log_dict = {"type": log_type,
                                 "time": log_delta_seconds,
                                 "process": log_process_name,
-                                "detail": log_detail}
+                                "detail": log_detail,
+                                "pid": log_data['pid']}
 
                     if self.filter_noises(log_dict):
                         continue
@@ -282,6 +283,13 @@ class DroidBox(object):
         # Kill ADB, otherwise it will never terminate
         self.stop()
         self.logcat = None
+
+        # Add process names to entries where it is empty (might be due to the ansynchronous fullfillment of pid2name dict)
+        for entry in self.sensitive_behaviors:
+            if entry["process"] == "":
+                log_process_names = self.process_monitor.get_names_by_pid(entry['pid'])
+                log_process_name = "->".join(log_process_names)
+                entry["process"] = log_process_name
 
         print json.dumps(self.get_output())
         if self.output_dir is None:
