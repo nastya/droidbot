@@ -92,39 +92,44 @@ class UTG(object):
         utg_edges = []
         for state_str in self.G.nodes():
             state = self.G.node[state_str]["state"]
-            package_name = state.foreground_activity.split("/")[0]
-            activity_name = state.foreground_activity.split("/")[1]
-            short_activity_name = activity_name.split(".")[-1]
+            if state is None:
+                continue
+            try:
+                package_name = state.foreground_activity.split("/")[0]
+                activity_name = state.foreground_activity.split("/")[1]
+                short_activity_name = activity_name.split(".")[-1]
 
-            state_desc = utils.list_to_html_table([
-                ("package", package_name),
-                ("activity", activity_name),
-                ("state_str", state.state_str),
-                ("structure_str", state.structure_str)
-            ])
+                state_desc = utils.list_to_html_table([
+                    ("package", package_name),
+                    ("activity", activity_name),
+                    ("state_str", state.state_str),
+                    ("structure_str", state.structure_str)
+                ])
 
-            utg_node = {
-                "id": state_str,
-                "shape": "image",
-                "image": os.path.relpath(state.screenshot_path, self.device.output_dir),
-                "label": short_activity_name,
-                # "group": state.foreground_activity,
-                "package": package_name,
-                "activity": activity_name,
-                "state_str": state_str,
-                "structure_str": state.structure_str,
-                "title": state_desc,
-                "content": "\n".join([package_name, activity_name, state.state_str, state.search_content])
-            }
+                utg_node = {
+                    "id": state_str,
+                    "shape": "image",
+                    "image": os.path.relpath(state.screenshot_path, self.device.output_dir),
+                    "label": short_activity_name,
+                    # "group": state.foreground_activity,
+                    "package": package_name,
+                    "activity": activity_name,
+                    "state_str": state_str,
+                    "structure_str": state.structure_str,
+                    "title": state_desc,
+                    "content": "\n".join([package_name, activity_name, state.state_str, state.search_content])
+                }
 
-            if state.state_str == self.first_state_str:
-                utg_node["label"] += "\n<FIRST>"
-                utg_node["font"] = "14px Arial red"
-            if state.state_str == self.last_state_str:
-                utg_node["label"] += "\n<LAST>"
-                utg_node["font"] = "14px Arial red"
+                if state.state_str == self.first_state_str:
+                    utg_node["label"] += "\n<FIRST>"
+                    utg_node["font"] = "14px Arial red"
+                if state.state_str == self.last_state_str:
+                    utg_node["label"] += "\n<LAST>"
+                    utg_node["font"] = "14px Arial red"
 
-            utg_nodes.append(utg_node)
+                utg_nodes.append(utg_node)
+            except AttributeError:
+                continue
 
         for state_transition in self.G.edges():
             from_state = state_transition[0]
