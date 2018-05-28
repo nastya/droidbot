@@ -287,7 +287,7 @@ class DroidBox(object):
         # Add process names to entries where it is empty (might be due to the ansynchronous fullfillment of pid2name dict)
         for entry in self.sensitive_behaviors:
             if entry["process"] == "":
-                log_process_names = self.process_monitor.get_names_by_pid(entry['pid'])
+                log_process_names = self.state_monitor.get_names_by_pid(entry['pid'])
                 log_process_name = "->".join(log_process_names)
                 entry["process"] = log_process_name
 

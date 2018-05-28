@@ -24,8 +24,11 @@ class TransitionGraph(object):
             self.data = self.build()
 
     def build(self):
-        self._init_data()
-        self.remove_duplicate_state()
+        try:
+            self._init_data()
+            self.remove_duplicate_state()
+        except:
+            return []
 
         return self.events
 
