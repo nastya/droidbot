@@ -135,6 +135,7 @@ class DynamicAPIModel:
             #print 'dmtracedump failed to parse trace file ', filename
             return {}
         dumping_threads = {}
+        thread_in_api = {}
         for line in full_trace.split("\n"):
             parsed_line = line.split()
             if len(parsed_line) < 10:
@@ -147,18 +148,25 @@ class DynamicAPIModel:
             args = parsed_line[9]
             if (len(parsed_line) >= 11):
                 usedfile = parsed_line[10]
-            if threadId in dumping_threads and dumping_threads[threadId] != '' and \
-                                                not DynamicAPIModel.app_method(method, used_packages):
-                threads_api[threadId].append(method)
             if DynamicAPIModel.app_method(method, used_packages):
                 if action == '0':
                     if not threadId in dumping_threads or dumping_threads[threadId] == '':
                         dumping_threads[threadId] = method
+                        thread_in_api[threadId] = ''
                     if not threadId in threads_api:
                         threads_api[threadId] = []
                 else:
                     if dumping_threads[threadId] == method:
                         dumping_threads[threadId] = ''
+                        thread_in_api[threadId] = ''
+            else:
+                if threadId in dumping_threads and dumping_threads[threadId] != '' and \
+                                                action == '0' and thread_in_api[threadId] == '':
+                    threads_api[threadId].append(method)
+                    thread_in_api[threadId] = method
+                if threadId in dumping_threads and dumping_threads[threadId] != '' and \
+                                                action == '1' and thread_in_api[threadId] == method:
+                    thread_in_api[threadId] = ''
         return threads_api
 
 
