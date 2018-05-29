@@ -120,7 +120,10 @@ class ADB(Adapter):
         """
         Get version of SDK, e.g. 18, 20
         """
-        return int(self.get_property(ADB.VERSION_SDK_PROPERTY))
+        try:
+           return int(self.get_property(ADB.VERSION_SDK_PROPERTY))
+        except ValueError:
+           return self.get_property(ADB.VERSION_SDK_PROPERTY)
 
     def get_release_version(self):
         """
