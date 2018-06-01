@@ -5,6 +5,7 @@ import re
 from adapter import Adapter
 import time
 import sys
+import os
 
 
 class ADBException(Exception):
