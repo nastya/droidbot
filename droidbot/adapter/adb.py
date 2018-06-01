@@ -2,6 +2,7 @@
 import subprocess
 import logging
 import re
+import os
 
 
 class ADBException(Exception):
@@ -85,7 +86,10 @@ class ADB(object):
 
         self.logger.debug('command:')
         self.logger.debug(args)
-        r = subprocess.check_output(args)
+        try:
+            r = subprocess.check_output(args)
+        except CalledProcessError:
+            os._exit()
         self.logger.debug('return:')
         self.logger.debug(r)
         return r
