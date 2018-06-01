@@ -4,6 +4,7 @@ import logging
 import re
 from adapter import Adapter
 import time
+import sys
 
 
 class ADBException(Exception):
@@ -61,7 +62,10 @@ class ADB(Adapter):
 
         self.logger.debug('command:')
         self.logger.debug(args)
-        r = subprocess.check_output(args).strip()
+        try:
+            r = subprocess.check_output(args).strip()
+        except CalledProcessError: #this might mean device/emulator crashed
+            sys._exit()
         self.logger.debug('return:')
         self.logger.debug(r)
         return r
