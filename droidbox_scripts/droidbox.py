@@ -117,7 +117,7 @@ class DroidBox(object):
         # No Main activity found? Return an error
         if main_activity is None:
             print("No activity to start. Terminate the analysis.")
-            sys._exit(1)
+            os._exit(1)
 
         # No packages identified? Return an error
         if package_name is None:
