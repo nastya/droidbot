@@ -156,7 +156,7 @@ class DynamicAPIModel:
                     if not threadId in threads_api:
                         threads_api[threadId] = []
                 else:
-                    if dumping_threads[threadId] == method:
+                    if threadId in dumping_threads and dumping_threads[threadId] == method:
                         dumping_threads[threadId] = ''
                         thread_in_api[threadId] = ''
             else:
