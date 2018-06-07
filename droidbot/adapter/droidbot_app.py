@@ -4,6 +4,7 @@ import subprocess
 import time
 import json
 import struct
+import os
 from adapter import Adapter
 
 DROIDBOT_APP_REMOTE_ADDR = "tcp:7336"
@@ -13,6 +14,7 @@ ACCESSIBILITY_SERVICE = DROIDBOT_APP_PACKAGE + "/io.github.privacystreams.access
 
 MAX_NUM_GET_VIEWS = 5
 GET_VIEW_WAIT_TIME = 1
+MAX_RESTARTED_TIMES = 100
 
 class DroidBotAppConnException(Exception):
     """
@@ -45,6 +47,7 @@ class DroidBotAppConn(Adapter):
         self.port = self.device.get_random_port()
         self.connected = False
         self.__can_wait = True
+        self.restarted_times = 0
 
         self.sock = None
         self.last_acc_event = None
@@ -129,6 +132,9 @@ class DroidBotAppConn(Adapter):
                 # clear self.last_acc_event
                 self.logger.warning(ex)
                 self.logger.warning("Restarting droidbot app")
+                self.restarted_times += 1
+                if self.restarted_times > MAX_RESTARTED_TIMES:
+                    os._exit()
                 self.last_acc_event = None
                 self.disconnect()
                 self.connect()
