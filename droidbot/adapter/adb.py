@@ -65,7 +65,7 @@ class ADB(Adapter):
         self.logger.debug(args)
         try:
             r = subprocess.check_output(args).strip()
-        except CalledProcessError: #this might mean device/emulator crashed
+        except subprocess.CalledProcessError: #this might mean device/emulator crashed
             os._exit()
         self.logger.debug('return:')
         self.logger.debug(r)
