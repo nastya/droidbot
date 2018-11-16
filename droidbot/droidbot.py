@@ -165,6 +165,8 @@ class DroidBot(object):
 
         self.stop()
         self.logger.info("DroidBot Stopped")
+        os._exit(0)
+
 
     def stop(self):
         self.enabled = False
