@@ -105,6 +105,8 @@ class DroidBot(object):
 
         self.stop()
         self.logger.info("DroidBot Stopped")
+        os._exit(0)
+
 
     def stop(self):
         if self.env_manager is not None:
