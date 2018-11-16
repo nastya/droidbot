@@ -10,15 +10,18 @@ dname = os.path.dirname(abspath)
 sys.path.append(dname + "/static_deps")
 import known_libs
 
+MODEL_TYPE_API = 0
+MODEL_TYPE_METHOD = 1
 
 class DynamicAPIModel:
     """
     The DynamicAPIModel (DAPIM) of an app
     uses the following entities: app state, events (stimulus), app reaction
     """
-    def __init__(self, input_path=None, used_packages=None):
+    def __init__(self, input_path=None, used_packages=None, model_type=MODEL_TYPE_API):
         #super(DynamicAPIModel, self).__init__(input_path)
         self.event_path = input_path + 'events' if input_path is not None else None
+        self.model_type = model_type
         self.used_packages = used_packages if used_packages is not None else []
         self.get_events_match()
         self.get_unique_states()
@@ -178,8 +181,12 @@ class DynamicAPIModel:
     def get_trace_info(self):
         self.event_trace = {}
         for event_tag in self.event_tags_list:
-            self.event_trace[event_tag] = DynamicAPIModel.parse_trace_file_api(self.event_path + \
-                '/event_trace_' + event_tag + '.trace', self.used_packages)
+            if self.model_type == MODEL_TYPE_API:
+                self.event_trace[event_tag] = DynamicAPIModel.parse_trace_file_api(self.event_path + \
+                    '/event_trace_' + event_tag + '.trace', self.used_packages)
+            else:
+                self.event_trace[event_tag] = DynamicAPIModel.parse_trace_file_appfunc(self.event_path + \
+                    '/event_trace_' + event_tag + '.trace', self.used_packages)
 
 def isLibraryClass(classname):
     package_method = False
@@ -212,14 +219,20 @@ def get_used_packages(apk_name):
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
-        print 'Specify path to droidbot output directory and .apk file'
+        print 'Specify path to droidbot output directory and .apk file (optional argument model_type: [API|Method])'
         sys.exit(0)
     input_path = sys.argv[1]
     input_path = os.path.abspath(input_path) + '/'
     apk_name = sys.argv[2]
     used_packages = get_used_packages(apk_name)
+    mode = 'API'
+    if len(sys.argv) > 3:
+        mode = sys.argv[3]
+    model_type = MODEL_TYPE_API
+    if mode == 'Method':
+        model_type = MODEL_TYPE_METHOD
 
-    graph = DynamicAPIModel(input_path, used_packages)
+    graph = DynamicAPIModel(input_path, used_packages, model_type)
 
     #data = graph.to_json()
     print json.dumps(graph.place_event_values(), indent = 4)
